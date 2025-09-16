@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="horizontal" android:padding="12dp">
+
+    <ImageView
+        android:id="@+id/imgThumb"
+        android:layout_width="72dp" android:layout_height="72dp"
+        android:scaleType="centerCrop"
+        android:background="@android:color/darker_gray" />
+
+    <LinearLayout
+        android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:orientation="vertical"
+        android:paddingStart="12dp" android:paddingEnd="12dp">
+        <TextView
+            android:id="@+id/tvName"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="16sp" android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/tvMeta"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="13sp"/>
+        <TextView
+            android:id="@+id/tvTags"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="12sp"/>
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/btnHeart"
+        android:layout_width="40dp" android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_favorite_filled"
+        android:contentDescription="@string/app_name"/>
+</LinearLayout>
