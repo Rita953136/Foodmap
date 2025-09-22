@@ -71,6 +71,9 @@ public class HomeFragment extends Fragment {
         });
         rv.setAdapter(adapter);
 
+        // 使用假資料，顯示 20 張一樣的卡片
+        adapter.submit(com.example.fmap.model.FakeData.fakePlaces(20));
+
         ItemTouchHelper.SimpleCallback cb = new ItemTouchHelper.SimpleCallback(0,
                 ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
             private static final float MAX_ROTATION = 15f;

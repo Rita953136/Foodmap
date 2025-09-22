@@ -7,19 +7,22 @@
     android:layout_margin="8dp"
     app:cardCornerRadius="20dp"
     app:cardElevation="6dp"
-    android:background="@color/lavender">
+    app:cardUseCompatPadding="true">
 
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#B9BEF0">
+        android:background="#FFFFFF">
 
+        <!-- 上方圖片 -->
         <ImageView
             android:id="@+id/imgThumb"
             android:layout_width="match_parent"
-            android:layout_height="170dp"
-            android:scaleType="centerCrop" />
+            android:layout_height="230dp"
+            android:scaleType="centerCrop"
+            android:background="#EDEDED"/>
 
+        <!-- 資訊區 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -27,46 +30,88 @@
             android:orientation="vertical"
             android:padding="12dp">
 
-            <TextView
-                android:id="@+id/tvName"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+            <!-- 第一行：左店名、右星星+分數 -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
 
+                <TextView
+                    android:id="@+id/tvName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toStartOf="@+id/ratingRow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+
+                <LinearLayout
+                    android:id="@+id/ratingRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent">
+
+                    <ImageView
+                        android:id="@+id/ivStar"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/baseline_star_24"
+                        app:tint="#FFC107"/>
+
+                    <TextView
+                        android:id="@+id/tvRating"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:textStyle="bold"
+                        android:textSize="14sp"/>
+                </LinearLayout>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- 第二行：灰字 Tag + 價位 + 距離 -->
+            <TextView
+                android:id="@+id/tvTags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="13sp"
+                android:textColor="#8E8E93"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+
+            <!-- 如果不需要單獨的 meta，可預設 GONE -->
             <TextView
                 android:id="@+id/tvMeta"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/tvTags"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="13sp" />
+                android:visibility="gone"
+                android:textSize="14sp"/>
         </LinearLayout>
 
-        <!-- Like / Nope 貼紙（透明度在滑動時調整） -->
+        <!-- 貼紙（保留你原本的） -->
         <TextView
             android:id="@+id/badgeLike"
             android:layout_width="94dp"
             android:layout_height="69dp"
             android:layout_alignParentTop="true"
             android:layout_alignParentEnd="true"
-            android:layout_marginStart="12dp"
-            android:layout_marginLeft="12dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginRight="12dp"
-            android:layout_marginBottom="12dp"
+            android:layout_margin="12dp"
+            android:layout_marginTop="60dp"
             android:alpha="0"
             android:background="#AA00C853"
             android:padding="10dp"
             android:text="LIKE"
             android:textColor="#FFFFFF"
             android:textSize="25sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"/>
 
         <TextView
             android:id="@+id/badgeNope"
@@ -74,18 +119,14 @@
             android:layout_height="68dp"
             android:layout_alignParentStart="true"
             android:layout_alignParentTop="true"
-            android:layout_marginStart="12dp"
-            android:layout_marginLeft="12dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginRight="12dp"
-            android:layout_marginBottom="12dp"
+            android:layout_margin="12dp"
+            android:layout_marginTop="60dp"
             android:alpha="0"
             android:background="#AAD50000"
             android:padding="10dp"
             android:text="NOPE"
             android:textColor="#FFFFFF"
-            android:textSize="25sp"
-            android:textStyle="bold" />
+            android:textSize="30sp"
+            android:textStyle="bold"/>
     </RelativeLayout>
 </com.google.android.material.card.MaterialCardView>

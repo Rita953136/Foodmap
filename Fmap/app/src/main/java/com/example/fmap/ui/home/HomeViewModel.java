@@ -8,7 +8,6 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.fmap.data.DailyQuotaManager;
-import com.example.fmap.data.MockPlacesRepository;
 import com.example.fmap.data.PlacesRepository;
 import com.example.fmap.model.Place;
 import com.example.fmap.model.SwipeAction;
@@ -19,6 +18,8 @@ import com.example.fmap.data.FavoritesStore;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import com.example.fmap.BuildConfig;
+import com.example.fmap.model.FakeData;
 
 public class HomeViewModel extends AndroidViewModel {
     public static final int DAILY_LIMIT = 10;
@@ -35,11 +36,14 @@ public class HomeViewModel extends AndroidViewModel {
 
     private Integer devOverrideLimit = null;
 
+    private static final boolean USE_FAKE_IN_DEBUG = true; // Debug 模式下是否使用 FakeData
+
+
     public HomeViewModel(@NonNull Application app) {
         super(app);
         this.quota = new DailyQuotaManager(app.getApplicationContext());
         this.favorites = new FavoritesStore(app.getApplicationContext());
-        this.repo = new MockPlacesRepository(app.getAssets());
+        this.repo = RepositoryProvider.getPlaces();
     }
 
     public LiveData<List<Place>> getPlaces() { return places; }
@@ -54,12 +58,24 @@ public class HomeViewModel extends AndroidViewModel {
             exhausted.setValue(true);
             return;
         }
+
+        // ★ 集中切換：Debug + 允許使用假資料 → 直接丟 FakeData
+        if (BuildConfig.DEBUG && USE_FAKE_IN_DEBUG) {
+            List<Place> fake = FakeData.fakePlaces(remain);
+            places.setValue(fake);
+            currentIndex.setValue(0);
+            exhausted.setValue(false);
+            return; // 直接返回，不再呼叫真實 repository
+        }
+
+        // ↓↓↓ 正式資料路徑（保持不動）↓↓↓
         List<Place> all = repo.getRecommendations();
         if (all.size() > remain) all = all.subList(0, remain);
         places.setValue(all);
         currentIndex.setValue(0);
         exhausted.setValue(false);
     }
+
 
     public void onSwipedRight(Place p) {
         liked.add(p);

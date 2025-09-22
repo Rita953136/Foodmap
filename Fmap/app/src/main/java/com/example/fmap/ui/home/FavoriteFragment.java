@@ -23,6 +23,7 @@ import com.example.fmap.model.FavItem;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.example.fmap.model.FakeData;
 
 public class FavoriteFragment extends Fragment {
 
@@ -32,8 +33,9 @@ public class FavoriteFragment extends Fragment {
     private final ActivityResultLauncher<Intent> detailLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == Activity.RESULT_OK) {
-                    adapter.submit(store.getAll());
+                    adapter.submit(FakeData.fakeFavItems(10)); // 這裡設定 10 筆假資料
                     updateEmpty();
+
                 }
             });
     private boolean pendingReload = false;
@@ -76,7 +78,8 @@ public class FavoriteFragment extends Fragment {
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
         rv.setAdapter(adapter);
 
-        adapter.submit(store.getAll());
+        // 使用假資料（共用 FakeData）
+        adapter.submit(FakeData.fakeFavItems(10));
         updateEmpty();
 
         }

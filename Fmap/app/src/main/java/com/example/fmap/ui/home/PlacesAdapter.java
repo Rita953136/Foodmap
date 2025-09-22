@@ -63,7 +63,16 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
     @Override public int getItemCount() { return items.size(); }
 
     static class VH extends RecyclerView.ViewHolder {
-        ImageView img; TextView tvName; TextView tvMeta; TextView tvTags; TextView like; TextView nope;
+        ImageView img;
+        TextView tvName;
+        TextView tvMeta;   // 這版不使用，預設會 GONE
+        TextView tvTags;   // 第二行：#Tag · $$ · 距離
+        TextView like, nope;
+
+        // 右上角評分
+        ImageView ivStar;
+        TextView tvRating;
+
         VH(@NonNull View v) {
             super(v);
             img = v.findViewById(R.id.imgThumb);
@@ -72,24 +81,79 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
             tvTags = v.findViewById(R.id.tvTags);
             like = v.findViewById(R.id.badgeLike);
             nope = v.findViewById(R.id.badgeNope);
+            ivStar = v.findViewById(R.id.ivStar);
+            tvRating = v.findViewById(R.id.tvRating);
         }
+
         void bind(Place p) {
-            tvName.setText(p.getName());
-            String price = p.getPriceLevel() != null ? new String(new char[p.getPriceLevel()]).replace("\0", "$") : "-";
-            String dist = p.getDistanceMeters() != null ? (" · " + p.getDistanceMeters() + "m") : "";
-            String rating = p.getRating() != null ? String.valueOf(p.getRating()) : "-";
-            tvMeta.setText("★ " + rating + " · " + price + dist);
-            List<String> tags = p.getTags();
-            tvTags.setText(tags == null ? "" : join(tags));
-            like.setAlpha(0f); nope.setAlpha(0f);
-            //if (p.getThumbnailUrl() != null) Glide.with(img.getContext()).load(p.getThumbnailUrl()).into(img);
-            //else img.setImageDrawable(null);
+            // 第一行：店名（左）
+            tvName.setText(p.getName() != null ? p.getName() : "");
+
+            // 第一行：評分（右）
+            Double rt = p.getRating();
+            if (rt != null && rt >= 0) {
+                tvRating.setText(String.valueOf(rt));
+                ivStar.setVisibility(View.VISIBLE);
+                tvRating.setVisibility(View.VISIBLE);
+            } else {
+                ivStar.setVisibility(View.GONE);
+                tvRating.setVisibility(View.GONE);
+            }
+
+            // 第二行：#Tag1 #Tag2 #Tag3 · $$ · 500公尺
+            String price = dollars(p.getPriceLevel());           // "$$", or "-"
+            String dist  = metersToHuman(p.getDistanceMeters()); // "500公尺" 或 ""
+            java.util.List<String> tags = p.getTags();
+
+            StringBuilder line2 = new StringBuilder();
+            if (tags != null && !tags.isEmpty()) {
+                for (int i = 0; i < Math.min(3, tags.size()); i++) {
+                    if (i > 0) line2.append(' ');
+                    line2.append('#').append(tags.get(i));
+                }
+            }
+            if (!"-".equals(price)) {
+                if (line2.length() > 0) line2.append(" · ");
+                line2.append(price);
+            }
+            if (!dist.isEmpty()) {
+                if (line2.length() > 0) line2.append(" · ");
+                line2.append(dist);
+            }
+
+            if (line2.length() == 0) {
+                tvTags.setText("");
+                tvTags.setVisibility(View.GONE);   // 沒內容就收起來
+            } else {
+                tvTags.setText(line2.toString());
+                tvTags.setVisibility(View.VISIBLE);
+            }
+
+            // 這個版型不使用 tvMeta
+            tvMeta.setVisibility(View.GONE);
+
+            // 圖片（目前用假圖；要真圖就用 Glide 載入 thumbnailUrl）
+            // if (p.getThumbnailUrl() != null) Glide.with(img.getContext()).load(p.getThumbnailUrl()).into(img);
+            // else img.setImageDrawable(null);
             img.setImageResource(R.drawable.ic_launcher_foreground);
+
+            // 貼紙預設透明
+            like.setAlpha(0f);
+            nope.setAlpha(0f);
         }
-        private String join(List<String> list) {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < list.size() && i < 3; i++) { if (i > 0) sb.append("  •  "); sb.append(list.get(i)); }
-            return sb.toString();
+
+        private static String dollars(Integer level) {
+            if (level == null || level <= 0) return "-";
+            char[] c = new char[level];
+            java.util.Arrays.fill(c, '$');
+            return new String(c);
+        }
+
+        private static String metersToHuman(Integer m) {
+            if (m == null || m <= 0) return "";
+            // 想 >=1000 顯示公里可改：
+            // if (m >= 1000) return new java.text.DecimalFormat("#.0").format(m / 1000.0) + "公里";
+            return m + "公尺";
         }
     }
 }
