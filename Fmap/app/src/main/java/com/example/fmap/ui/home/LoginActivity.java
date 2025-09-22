@@ -14,12 +14,12 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.developer.gbuttons.GoogleSignInButton;
 import com.example.fmap.R;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.SignInButton;         // ← 改用官方按鈕
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
@@ -31,7 +31,7 @@ public class LoginActivity extends AppCompatActivity {
     private EditText loginEmail, loginPassword;
     private TextView signupRedirectText, forgotPassword;
     private Button loginButton;
-    private GoogleSignInButton googleBtn;
+    private SignInButton googleBtn;                       // ← 這裡改型別
 
     private FirebaseAuth auth;
     private GoogleSignInClient gClient;
@@ -96,6 +96,10 @@ public class LoginActivity extends AppCompatActivity {
                 });
 
         bindViews();
+        // 以程式設定按鈕外觀，避免 XML 屬性相容性問題
+        googleBtn.setSize(SignInButton.SIZE_WIDE);
+        googleBtn.setColorScheme(SignInButton.COLOR_DARK);
+
         bindActions();
     }
 
@@ -105,7 +109,7 @@ public class LoginActivity extends AppCompatActivity {
         loginButton = findViewById(R.id.login_button);
         signupRedirectText = findViewById(R.id.signUpRedirectText);
         forgotPassword = findViewById(R.id.forgot_password);
-        googleBtn = findViewById(R.id.googleBtn);
+        googleBtn = findViewById(R.id.googleBtn);            // XML 也要是 com.google.android.gms.common.SignInButton
     }
 
     private void bindActions() {
@@ -140,30 +144,7 @@ public class LoginActivity extends AppCompatActivity {
                 });
     }
 
-    // 忘記密碼：如要啟用，取消註解本方法與上方 onClick 綁定
-//    private void showForgotDialog() {
-//        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-//        View dialogView = getLayoutInflater().inflate(R.layout.dialog_forgot, null);
-//        EditText emailBox = dialogView.findViewById(R.id.emailBox);
-//        builder.setView(dialogView);
-//        AlertDialog dialog = builder.create();
-//
-//        dialogView.findViewById(R.id.btnReset).setOnClickListener(v -> {
-//            String userEmail = emailBox.getText().toString().trim();
-//            if (TextUtils.isEmpty(userEmail) || !Patterns.EMAIL_ADDRESS.matcher(userEmail).matches()) {
-//                toast("請輸入註冊 Email");
-//                return;
-//            }
-//            auth.sendPasswordResetEmail(userEmail).addOnCompleteListener(t -> {
-//                toast(t.isSuccessful() ? "已寄出重設信" : "寄送失敗");
-//                if (t.isSuccessful()) dialog.dismiss();
-//            });
-//        });
-//        dialogView.findViewById(R.id.btnCancel).setOnClickListener(v -> dialog.dismiss());
-//        dialog.show();
-//    }
-
-    /** 登入/註冊成功：只回傳 RESULT_OK，MainActivity 會用 FirebaseAuth 取 user 並更新 UI */
+    /** 登入/註冊成功：只回傳 RESULT_OK，MainActivity 再用 FirebaseAuth 更新 UI */
     private void returnSuccess() {
         setResult(Activity.RESULT_OK);
         finish();
@@ -171,4 +152,3 @@ public class LoginActivity extends AppCompatActivity {
 
     private void toast(String msg) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show(); }
 }
-

@@ -2,30 +2,39 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission,INTERNET"/>
+    <!-- 權限：放在 <manifest> 直屬下 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:theme="@style/Theme.Material3.DayNight.NoActionBar"
         tools:targetApi="31">
-        <activity
-            android:name=".ui.home.MainActivity"
-            android:launchMode="singleTop"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
 
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+        <!-- Maps API Key：必須放在 <application> 內 -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_key" />
+
         <activity android:name=".ui.home.PlaceDetailActivity" />
         <activity android:name=".ui.home.SignupActivity" />
         <activity android:name=".ui.home.LoginActivity" />
-    </application>
+        <activity
+            android:name=".ui.home.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
+    </application>
 </manifest>

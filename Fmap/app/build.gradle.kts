@@ -1,13 +1,11 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    // 用 catalog 的話通常是這個別名；若你沒在 toml 定義，就改成下一行的 id(...)
-    // alias(libs.plugins.google.services)
-    id("com.google.gms.google-services") // ← 確保至少有這行其中之一
+    id("com.google.gms.google-services")
+    // 若整個專案是 Java 為主，不需要 kapt；若將來用到 Glide 的 @GlideModule + Kotlin 再另外加 kapt
 }
 
 android {
-    buildFeatures { buildConfig = true }
     namespace = "com.example.fmap"
     compileSdk = 35
 
@@ -17,62 +15,74 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables.useSupportLibrary = true
     }
 
     buildTypes {
-        debug {
-            buildConfigField("boolean", "USE_MOCK", "true")
-            buildConfigField("String", "BASE_URL", "\"https://your.api/\"")
-        }
         release {
-            buildConfigField("boolean", "USE_MOCK", "false")
-            buildConfigField("String", "BASE_URL", "\"https://your.api/\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
+        debug { }
     }
 
-    // 建議 AGP 8.x 使用 JDK 17
+    buildFeatures {
+        viewBinding = true
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.constraintlayout)
+    // --- AndroidX / 基本元件 ---
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
+    implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
+    implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
 
-    implementation("com.google.code.gson:gson:2.10.1")
-    implementation("com.github.bumptech.glide:glide:4.16.0")
-
-    // GButton 來自 JitPack（settings.gradle.kts 已加入 jitpack repo）
-    implementation("com.github.TutorialsAndroid:GButton:v1.0.19")
-
-    // 🔥 Firebase：用 BoM 管版本
-    implementation(platform("com.google.firebase:firebase-bom:33.2.0"))
-    implementation("com.google.firebase:firebase-auth")
-
-    // Google Sign-In（新版）
+    // --- Google Maps & Google Sign-In (Auth) ---
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 
-    // ⛔ 移除假的依賴，這一條會讓解析必炸
-    // implementation("com.github.User:Repo:Tag")
+    // --- JSON (FavoritesStore 需要) ---
+    implementation("com.google.code.gson:gson:2.11.0")
 
-    // 如果真的需要 Credential Manager 再保留，否則先拿掉以減少衝突
-    // implementation(libs.androidx.credentials)
-    // implementation(libs.androidx.credentials.play.services.auth)
-    // implementation(libs.googleid)
+    // --- 圖片載入（Glide）---
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+    // 若將來改用 Kotlin + kapt 再把上面改為：
+    // kapt("com.github.bumptech.glide:compiler:4.16.0")
 
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+
+
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
+    implementation("com.google.firebase:firebase-auth")
+    // --- 測試 ---
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }
