@@ -1,3 +1,3 @@
 package com.example.fmap.model;
 
-public enum SwipeAction { LIKE, DISLIKE }
+public enum SwipeAction { LIKE, NOPE }

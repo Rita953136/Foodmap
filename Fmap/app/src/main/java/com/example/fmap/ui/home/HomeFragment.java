@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -77,6 +78,19 @@ public class HomeFragment extends Fragment {
             Toast.makeText(requireContext(), p.name, Toast.LENGTH_SHORT).show();
         });
         rvCards.setAdapter(adapter);
+        // === 綁定左右滑動（LIKE / NOPE）===
+        ItemTouchHelper itemTouchHelper = new ItemTouchHelper(
+                new SwipeCallback(adapter, (record, pos) -> {
+                    // 這裡是滑動後回呼，可自行記錄到 Firestore 或 Log
+                    Log.d("Swipe", "店家 " + record.placeId + " → " + record.action);
+                    // 範例：Toast 提示
+                    Toast.makeText(requireContext(),
+                            (record.action == com.example.fmap.model.SwipeAction.LIKE ? "喜歡 👍" : "略過 👎"),
+                            Toast.LENGTH_SHORT).show();
+                })
+        );
+        itemTouchHelper.attachToRecyclerView(rvCards);
+
 
         // Firestore
         db = FirebaseFirestore.getInstance();
