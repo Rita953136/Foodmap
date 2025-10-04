@@ -1,34 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="176dp"
-    android:gravity="bottom"
-    android:padding="16dp"
-    android:background="@drawable/headerbkg"
-    android:theme="@style/ThemeOverlay.AppCompat.Dark">
-
-    <ImageView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/aklogo"/>
+    android:layout_height="80dp"
+    android:orientation="vertical"
+    android:gravity="bottom|start"
+    android:paddingStart="24dp"
+    android:paddingBottom="24dp"
+    android:background="#F2F2F7">
 
     <TextView
-        android:id="@+id/headerName"
+        android:id="@+id/tvAppName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Happy Food Map "
-        android:textColor="@color/white"
-        android:textStyle="bold"/>
-
-    <TextView
-        android:id="@+id/headerEmail"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="contact@happyfoodmap.com"
-        android:textColor="@color/white"
-        android:textSize="14sp"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginTop="10dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="標籤"
+        android:textColor="@android:color/black"
+        android:textSize="22sp" />
 
 </LinearLayout>

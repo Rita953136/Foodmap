@@ -11,7 +11,11 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -33,11 +37,27 @@ public class MockPlacesRepository implements PlacesRepository {
 
             List<Place> out = new ArrayList<>();
             for (PlaceJson r : raw) {
-                out.add(new Place(
-                        r.id, r.name, r.lat, r.lng, r.rating, r.distanceMeters,
-                        r.tags == null ? Collections.emptyList() : r.tags,
-                        r.priceLevel, r.thumbnailUrl
-                ));
+                Place p = new Place();
+                p.id   = r.id;
+                p.name = r.name;
+
+                // 位置/距離/價位
+                p.lat  = r.lat;
+                p.lng  = r.lng;
+                p.distanceMeters = r.distanceMeters;
+                p.priceLevel     = r.priceLevel;
+
+                // 評分
+                p.rating = (r.rating != null) ? r.rating : 0d;
+
+                // 圖片
+                p.photoUrl = r.thumbnailUrl;
+
+                // 標籤
+                p.tags = (r.tags != null) ? new ArrayList<>(r.tags) : new ArrayList<>();
+                p.introLine = buildIntroLineFromTags(p.tags); // 轉成 "#西式 #麵食 #清淡"
+
+                out.add(p);
             }
             return out;
 
@@ -45,6 +65,19 @@ public class MockPlacesRepository implements PlacesRepository {
             e.printStackTrace();
             return Collections.emptyList();
         }
+    }
+
+    private static String buildIntroLineFromTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String t : tags) {
+            if (t == null) continue;
+            String v = t.trim();
+            if (v.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append('#').append(v);
+        }
+        return sb.toString();
     }
 
     @Override
@@ -55,16 +88,17 @@ public class MockPlacesRepository implements PlacesRepository {
             if (q != null && !q.isEmpty()) {
                 String ql = q.toLowerCase(Locale.ROOT);
                 data = data.stream().filter(p ->
-                        p.getName().toLowerCase(Locale.ROOT).contains(ql) ||
-                                p.getTags().stream().anyMatch(t -> t.toLowerCase(Locale.ROOT).contains(ql))
+                        (p.getName() != null && p.getName().toLowerCase(Locale.ROOT).contains(ql)) ||
+                                (p.getTags() != null && p.getTags().stream()
+                                        .anyMatch(t -> t != null && t.toLowerCase(Locale.ROOT).contains(ql)))
                 ).collect(Collectors.toList());
             }
 
             if ("rating_desc".equals(sort)) {
                 data = data.stream()
                         .sorted((a, b) -> {
-                            double ra = a.getRating() == null ? -1 : a.getRating();
-                            double rb = b.getRating() == null ? -1 : b.getRating();
+                            double ra = a.getRating() != null ? a.getRating() : -1d;
+                            double rb = b.getRating() != null ? b.getRating() : -1d;
                             return Double.compare(rb, ra);
                         })
                         .collect(Collectors.toList());
@@ -89,6 +123,6 @@ public class MockPlacesRepository implements PlacesRepository {
     @Override
     public CompletableFuture<Place> get(String id) {
         return CompletableFuture.supplyAsync(() ->
-                db.stream().filter(p -> p.getId().equals(id)).findFirst().orElse(null));
+                db.stream().filter(p -> id != null && id.equals(p.getId())).findFirst().orElse(null));
     }
 }

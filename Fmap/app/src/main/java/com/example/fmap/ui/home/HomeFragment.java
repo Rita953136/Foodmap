@@ -1,38 +1,55 @@
 package com.example.fmap.ui.home;
 
-import android.content.pm.ApplicationInfo;
-import android.graphics.Canvas;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.Observer;
-import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.R;
 import com.example.fmap.model.Place;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QuerySnapshot;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 首頁卡片清單（Firestore 非同步，映射 stores_summary 欄位）
+ */
 public class HomeFragment extends Fragment {
 
-    private HomeViewModel vm;
-    private PlacesAdapter adapter;
-    private LinearLayout emptyView;
+    private static final String TAG = "HomeFragment";
+    private static final String COLLECTION = "stores_summary"; // Firestore 集合名
+    private static final int PAGE_SIZE = 50;
 
-    @Nullable @Override
+    // UI
+    private RecyclerView rvCards;
+    private View emptyView;
+    private TextView tvEmpty;
+    private Button btnGoSearch, btnDevReset;
+
+    private PlacesAdapter adapter;
+
+    // Firestore
+    private FirebaseFirestore db;
+    private DocumentSnapshot lastDoc = null;
+    private boolean isLoading = false;
+    private boolean isEnd = false;
+
+    @Nullable
+    @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
@@ -43,117 +60,147 @@ public class HomeFragment extends Fragment {
     public void onViewCreated(@NonNull View v, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(v, savedInstanceState);
 
-        vm = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
-
-        RecyclerView rv = v.findViewById(R.id.rvCards);
+        // find views
+        rvCards = v.findViewById(R.id.rvCards);
         emptyView = v.findViewById(R.id.emptyView);
-        TextView tvEmpty = v.findViewById(R.id.tvEmpty);
-        Button btnGoSearch = v.findViewById(R.id.btnGoSearch);
-        Button btnDevReset = v.findViewById(R.id.btnDevReset);
+        tvEmpty = v.findViewById(R.id.tvEmpty);
+        btnGoSearch = v.findViewById(R.id.btnGoSearch);
+        btnDevReset = v.findViewById(R.id.btnDevReset);
 
-        boolean isDebug = (requireContext().getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
-        btnDevReset.setVisibility(isDebug ? View.VISIBLE : View.GONE);
-        btnDevReset.setOnClickListener(view -> {
-            vm.devResetQuotaAndReload();
-            Toast.makeText(requireContext(), "已重置今日額度", Toast.LENGTH_SHORT).show();
+        // RecyclerView
+        rvCards.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvCards.setHasFixedSize(true);
+        rvCards.setItemAnimator(null);
+
+        adapter = new PlacesAdapter(position -> {
+            Place p = adapter.getItem(position);
+            Toast.makeText(requireContext(), p.name, Toast.LENGTH_SHORT).show();
         });
-        tvEmpty.setOnLongClickListener(view -> {
-            vm.devResetQuotaAndReload();
-            Toast.makeText(requireContext(), "已重置今日額度並補上新推薦", Toast.LENGTH_SHORT).show();
-            return true;
-        });
-        btnGoSearch.setOnClickListener(view ->
-                Toast.makeText(requireContext(), "前往搜尋（待實作）", Toast.LENGTH_SHORT).show());
+        rvCards.setAdapter(adapter);
 
-        adapter = new PlacesAdapter(position -> {});
-        rv.setLayoutManager(new LinearLayoutManager(requireContext()) {
-            @Override public boolean canScrollVertically() { return false; }
-        });
-        rv.setAdapter(adapter);
+        // Firestore
+        db = FirebaseFirestore.getInstance();
 
-        // 使用假資料，顯示 20 張一樣的卡片
-        adapter.submit(com.example.fmap.model.FakeData.fakePlaces(20));
-
-        ItemTouchHelper.SimpleCallback cb = new ItemTouchHelper.SimpleCallback(0,
-                ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
-            private static final float MAX_ROTATION = 15f;
-            private static final float SWIPE_THRESHOLD = 0.25f;
-
-            @Override public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) { return false; }
-
+        // 捲動到底部自動載下一頁
+        rvCards.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
-            public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView,
-                                    @NonNull RecyclerView.ViewHolder vh, float dX, float dY,
-                                    int actionState, boolean isCurrentlyActive) {
-                super.onChildDraw(c, recyclerView, vh, dX, dY, actionState, isCurrentlyActive);
-                float width = Math.max(1f, rv.getWidth());
-                float progress = Math.max(-1f, Math.min(1f, dX / width));
-                vh.itemView.setRotation(progress * MAX_ROTATION);
-
-                if (vh instanceof PlacesAdapter.VH) {
-                    PlacesAdapter.VH holder = (PlacesAdapter.VH) vh;
-                    holder.like.setAlpha(Math.max(0f, progress));
-                    holder.nope.setAlpha(Math.max(0f, -progress));
+            public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
+                if (dy <= 0) return;
+                LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
+                if (lm == null) return;
+                int visible = lm.getChildCount();
+                int total = lm.getItemCount();
+                int first = lm.findFirstVisibleItemPosition();
+                if (!isLoading && !isEnd && (first + visible) >= (total - 6)) {
+                    loadNextPage();
                 }
-
-                int pos = vh.getAdapterPosition();
-                RecyclerView.ViewHolder nextVH = rv.findViewHolderForAdapterPosition(pos + 1);
-                if (nextVH != null) {
-                    float scale = 0.94f + 0.06f * Math.min(1f, Math.abs(progress));
-                    nextVH.itemView.setScaleX(scale);
-                    nextVH.itemView.setScaleY(scale);
-                    nextVH.itemView.setTranslationY(-20f * Math.min(1f, Math.abs(progress)));
-                }
-            }
-
-            @Override public float getSwipeThreshold(@NonNull RecyclerView.ViewHolder viewHolder) { return SWIPE_THRESHOLD; }
-
-            @Override
-            public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder vh) {
-                super.clearView(recyclerView, vh);
-                vh.itemView.setRotation(0f);
-                if (vh instanceof PlacesAdapter.VH) {
-                    PlacesAdapter.VH holder = (PlacesAdapter.VH) vh;
-                    holder.like.setAlpha(0f);
-                    holder.nope.setAlpha(0f);
-                }
-                int pos = vh.getAdapterPosition();
-                RecyclerView.ViewHolder nextVH = rv.findViewHolderForAdapterPosition(pos + 1);
-                if (nextVH != null) {
-                    nextVH.itemView.setScaleX(0.94f);
-                    nextVH.itemView.setScaleY(0.94f);
-                    nextVH.itemView.setTranslationY(0f);
-                }
-            }
-
-            @Override
-            public void onSwiped(@NonNull RecyclerView.ViewHolder vh, int direction) {
-                int pos = vh.getAdapterPosition();
-                Place item = adapter.getItem(pos);
-                if (direction == ItemTouchHelper.RIGHT) vm.onSwipedRight(item);
-                else vm.onSwipedLeft(item);
-                adapter.removeAt(pos);
-                updateEmptyState();
-            }
-        };
-        new ItemTouchHelper(cb).attachToRecyclerView(rv);
-
-        vm.getPlaces().observe(getViewLifecycleOwner(), new Observer<List<Place>>() {
-            @Override public void onChanged(List<Place> places) {
-                adapter.submit(places != null ? places : Collections.<Place>emptyList());
-                updateEmptyState();
-            }
-        });
-        vm.getExhausted().observe(getViewLifecycleOwner(), new Observer<Boolean>() {
-            @Override public void onChanged(Boolean usedUp) {
-                if (usedUp != null && usedUp) updateEmptyState();
             }
         });
 
-        vm.loadRecommendations();
+        // 初次載入
+        loadFirstPage();
+
+        // 這兩個按鈕依需求實作
+        btnGoSearch.setOnClickListener(btn ->
+                Toast.makeText(requireContext(), "前往搜尋（TODO）", Toast.LENGTH_SHORT).show());
+        btnDevReset.setOnClickListener(btn ->
+                Toast.makeText(requireContext(), "重置額度（TODO）", Toast.LENGTH_SHORT).show());
     }
 
-    private void updateEmptyState() {
-        emptyView.setVisibility(adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
+    private void loadFirstPage() {
+        isEnd = false;
+        lastDoc = null;
+        // 如需先清空畫面再載入，可解開下一行
+        // adapter.submit(new ArrayList<>());
+        queryPage(null);
+    }
+
+    private void loadNextPage() {
+        if (isEnd || isLoading) return;
+        queryPage(lastDoc);
+    }
+
+    /** 執行一次分頁查詢（依 rating DESC，可自行更換排序欄位） */
+    private void queryPage(@Nullable DocumentSnapshot startAfter) {
+        isLoading = true;
+
+        Query q = db.collection(COLLECTION)
+                .orderBy("rating", Query.Direction.DESCENDING)
+                .limit(PAGE_SIZE);
+        if (startAfter != null) q = q.startAfter(startAfter);
+
+        q.get()
+                .addOnSuccessListener(this::onPageLoaded)
+                .addOnFailureListener(this::onLoadFailed);
+    }
+
+    /** 將 Firestore 文件手動映射到 Place，安全解析欄位型別 */
+    private void onPageLoaded(QuerySnapshot snap) {
+        isLoading = false;
+
+        Log.d(TAG, "載入筆數 = " + snap.size());
+        List<Place> newList = new ArrayList<>();
+
+        for (DocumentSnapshot d : snap.getDocuments()) {
+            Place p = new Place();
+            p.id = d.getId();
+            p.name = d.getString("name");
+            p.photoUrl = d.getString("photo_url");  // 對應 photo_url
+            p.introLine = d.getString("intro");     // 對應 intro
+
+            // rating 可能是 Number 或 String，安全解析
+            Object ratingObj = d.get("rating");
+            double ratingVal = 0d;
+            if (ratingObj instanceof Number) {
+                ratingVal = ((Number) ratingObj).doubleValue();
+            } else if (ratingObj instanceof String) {
+                try { ratingVal = Double.parseDouble(((String) ratingObj).trim()); }
+                catch (Exception ignore) { ratingVal = 0d; }
+            }
+            p.rating = ratingVal;
+
+            // tags_top3 解析為 List<String>
+            List<String> tags = new ArrayList<>();
+            Object rawTags = d.get("tags_top3");
+            if (rawTags instanceof List) {
+                for (Object o : (List<?>) rawTags) {
+                    if (o != null) tags.add(String.valueOf(o));
+                }
+            }
+            p.tags = tags;
+
+            newList.add(p);
+        }
+
+        // 分頁游標
+        if (snap.isEmpty()) {
+            isEnd = true;
+        } else {
+            lastDoc = snap.getDocuments().get(snap.size() - 1);
+        }
+
+        // 合併舊資料 + 新資料
+        List<Place> merged = new ArrayList<>();
+        for (int i = 0; i < adapter.getItemCount(); i++) {
+            merged.add(adapter.getItem(i));
+        }
+        merged.addAll(newList);
+        adapter.submit(merged);
+
+        toggleEmpty(adapter.getItemCount() == 0);
+    }
+
+    private void onLoadFailed(Exception e) {
+        isLoading = false;
+        Log.e(TAG, "讀取失敗", e);
+        Toast.makeText(requireContext(),
+                "讀取失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+        toggleEmpty(adapter.getItemCount() == 0);
+    }
+
+    private void toggleEmpty(boolean show) {
+        if (emptyView != null) emptyView.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (rvCards != null) rvCards.setVisibility(show ? View.GONE : View.VISIBLE);
+        if (show && tvEmpty != null) tvEmpty.setText("目前沒有可顯示的店家");
     }
 }

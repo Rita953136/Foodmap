@@ -48,7 +48,7 @@ public class FavoritesStore {
         fi.name = p.getName();
         fi.lat = p.getLat();
         fi.lng = p.getLng();
-        fi.rating = p.getRating();
+        fi.rating = p.getRating() != null ? p.getRating().doubleValue() : 0d;
         fi.distanceMeters = p.getDistanceMeters();
         fi.tags = p.getTags();
         fi.priceLevel = p.getPriceLevel();

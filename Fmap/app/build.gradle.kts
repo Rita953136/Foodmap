@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("com.google.gms.google-services")
-    // 若整個專案是 Java 為主，不需要 kapt；若將來用到 Glide 的 @GlideModule + Kotlin 再另外加 kapt
 }
 
 android {
@@ -69,14 +68,14 @@ dependencies {
     // --- JSON (FavoritesStore 需要) ---
     implementation("com.google.code.gson:gson:2.11.0")
 
-    // --- 圖片載入（Glide）---
+    // --- 圖片載入---
     implementation("com.github.bumptech.glide:glide:4.16.0")
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
-    // 若將來改用 Kotlin + kapt 再把上面改為：
-    // kapt("com.github.bumptech.glide:compiler:4.16.0")
 
     implementation("com.google.android.gms:play-services-maps:18.2.0")
 
+    // Firestore
+    implementation ("com.google.firebase:firebase-firestore")
 
     implementation("com.google.android.gms:play-services-auth:21.2.0")
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))

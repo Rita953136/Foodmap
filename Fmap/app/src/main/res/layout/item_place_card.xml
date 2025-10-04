@@ -3,34 +3,42 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="320dp"
-    android:layout_margin="8dp"
+    android:layout_height="wrap_content"
+    android:layout_marginVertical="8dp"
+    android:layout_marginHorizontal="8dp"
+    android:background="@android:color/transparent"
+    app:cardBackgroundColor="@android:color/white"
     app:cardCornerRadius="20dp"
     app:cardElevation="6dp"
-    app:cardUseCompatPadding="true">
+    app:cardUseCompatPadding="false"
+    app:cardPreventCornerOverlap="true"
+    app:strokeWidth="0dp">
 
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#FFFFFF">
+        android:layout_height="wrap_content">
 
-        <!-- 上方圖片 -->
+        <!-- 上半：圖片 -->
         <ImageView
             android:id="@+id/imgThumb"
             android:layout_width="match_parent"
             android:layout_height="230dp"
             android:scaleType="centerCrop"
-            android:background="#EDEDED"/>
+            android:background="#EDEDED" />
 
-        <!-- 資訊區 -->
+        <!-- 下半：文字區（白底） -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_below="@id/imgThumb"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:paddingLeft="12dp"
+            android:paddingTop="12dp"
+            android:paddingRight="12dp"
+            android:paddingBottom="14dp"
+            android:background="@android:color/white">
 
-            <!-- 第一行：左店名、右星星+分數 -->
+            <!-- 第一行：店名 + 評分 -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
@@ -39,14 +47,14 @@
                     android:id="@+id/tvName"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
                     android:maxLines="1"
                     android:ellipsize="end"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toStartOf="@+id/ratingRow"
                     app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"/>
+                    app:layout_constraintBottom_toBottomOf="parent" />
 
                 <LinearLayout
                     android:id="@+id/ratingRow"
@@ -62,41 +70,33 @@
                         android:id="@+id/ivStar"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:src="@drawable/baseline_star_24"
-                        app:tint="#FFC107"/>
+                        android:src="@android:drawable/btn_star_big_on"
+                        app:tint="#FFC107" />
 
                     <TextView
                         android:id="@+id/tvRating"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="4dp"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
-
             </androidx.constraintlayout.widget.ConstraintLayout>
 
-            <!-- 第二行：灰字 Tag + 價位 + 距離 -->
+            <!-- 第二行：標籤 -->
             <TextView
                 android:id="@+id/tvTags"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textSize="13sp"
-                android:textColor="#8E8E93"
+                android:layout_marginTop="2dp"
                 android:maxLines="1"
-                android:ellipsize="end"/>
-
-            <!-- 如果不需要單獨的 meta，可預設 GONE -->
-            <TextView
-                android:id="@+id/tvMeta"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="gone"
-                android:textSize="14sp"/>
+                android:ellipsize="end"
+                android:textSize="13sp"
+                android:textColor="#555555"
+                android:fontFamily="sans-serif-medium" />
         </LinearLayout>
 
-        <!-- 貼紙（保留你原本的） -->
+        <!-- 貼紙 -->
         <TextView
             android:id="@+id/badgeLike"
             android:layout_width="94dp"
@@ -109,9 +109,9 @@
             android:background="#AA00C853"
             android:padding="10dp"
             android:text="LIKE"
-            android:textColor="#FFFFFF"
+            android:textColor="@android:color/white"
             android:textSize="25sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/badgeNope"
@@ -125,8 +125,8 @@
             android:background="#AAD50000"
             android:padding="10dp"
             android:text="NOPE"
-            android:textColor="#FFFFFF"
+            android:textColor="@android:color/white"
             android:textSize="30sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold" />
     </RelativeLayout>
 </com.google.android.material.card.MaterialCardView>
