@@ -3,88 +3,132 @@ package com.example.fmap.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import com.example.fmap.model.FavItem;
-import com.example.fmap.model.Place;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import androidx.annotation.NonNull;
 
-import java.lang.reflect.Type;
+import com.example.fmap.model.FavItem;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
-/** 簡易收藏儲存（SharedPreferences + Gson） */
+/** 本機收藏（SharedPreferences JSON 持久化） */
 public class FavoritesStore {
-    private static final String PREF = "favorites_store";
-    private static final String KEY  = "items_v1";
 
-    private final SharedPreferences prefs;
-    private final Gson gson = new Gson();
-    private final Type listType = new TypeToken<List<FavItem>>(){}.getType();
+    private static final String PREF = "favorites_store_v1";
+    private static final String KEY_LIST = "fav_list";
+    private final SharedPreferences sp;
 
-    public FavoritesStore(Context ctx) {
-        prefs = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+    public FavoritesStore(@NonNull Context ctx) {
+        this.sp = ctx.getApplicationContext().getSharedPreferences(PREF, Context.MODE_PRIVATE);
     }
 
-    /** 讀取全部收藏清單 */
-    public synchronized List<FavItem> getAll() {
-        String json = prefs.getString(KEY, "[]");
-        List<FavItem> list = gson.fromJson(json, listType);
-        return list != null ? list : new ArrayList<FavItem>();
+    /* ---------- 對外 API ---------- */
+
+    /** Upsert：存在就更新，不存在就新增（以 id 為 key） */
+    public synchronized void addOrUpdate(@NonNull FavItem item) {
+        if (item.id == null || item.id.isEmpty()) return;
+        List<FavItem> all = getAll();
+        int idx = indexOf(all, item.id);
+        if (idx >= 0) all.set(idx, item);
+        else all.add(0, item); // 新加入放最上
+        saveAll(all);
     }
 
-    /** 是否已收藏 */
-    public synchronized boolean isFavorite(String id) {
-        for (FavItem f : getAll()) if (id.equals(f.id)) return true;
-        return false;
+    /** 新增（不判重） */
+    public synchronized void add(@NonNull FavItem item) {
+        List<FavItem> all = getAll();
+        all.add(0, item);
+        saveAll(all);
     }
 
-    /** 加入收藏（由 Place 轉 FavItem） */
-    public synchronized void add(Place p) {
-        List<FavItem> list = getAll();
-        for (FavItem f : list) if (p.getId().equals(f.id)) return; // 已存在
-        FavItem fi = new FavItem();
-        fi.id = p.getId();
-        fi.name = p.getName();
-        fi.lat = p.getLat();
-        fi.lng = p.getLng();
-        fi.rating = p.getRating() != null ? p.getRating().doubleValue() : 0d;
-        fi.distanceMeters = p.getDistanceMeters();
-        fi.tags = p.getTags();
-        fi.priceLevel = p.getPriceLevel();
-        fi.thumbnailUrl = p.getThumbnailUrl();
-        list.add(fi);
-        prefs.edit().putString(KEY, gson.toJson(list)).apply();
-    }
-
-    /** 取消收藏 */
-    public synchronized void remove(String id) {
-        List<FavItem> list = getAll();
-        for (Iterator<FavItem> it = list.iterator(); it.hasNext(); ) {
-            if (id.equals(it.next().id)) it.remove();
+    public synchronized void remove(@NonNull String id) {
+        List<FavItem> all = getAll();
+        int idx = indexOf(all, id);
+        if (idx >= 0) {
+            all.remove(idx);
+            saveAll(all);
         }
-        prefs.edit().putString(KEY, gson.toJson(list)).apply();
     }
 
-    /** 切換收藏狀態：已收藏則移除，未收藏則加入 */
-    public synchronized void toggle(Place p) {
-        if (isFavorite(p.getId())) remove(p.getId()); else add(p);
+    public synchronized void clear() {
+        sp.edit().remove(KEY_LIST).apply();
     }
 
-    /** 清空（開發/測試用） */
-    public synchronized void clearAll() {
-        prefs.edit().putString(KEY, "[]").apply();
+    /** 讀全部收藏（已排序，最新在前） */
+    @NonNull
+    public synchronized List<FavItem> getAll() {
+        String raw = sp.getString(KEY_LIST, null);
+        List<FavItem> out = new ArrayList<>();
+        if (raw == null || raw.isEmpty()) return out;
+
+        try {
+            JSONArray arr = new JSONArray(raw);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o != null) out.add(fromJson(o));
+            }
+        } catch (Exception ignore) { /* 破檔容忍 */ }
+        return out;
     }
 
-    public synchronized void addByFields(String id, String name, Double rating, Integer distance,
-                                         Integer price, java.util.List<String> tags,
-                                         String thumb, double lat, double lng) {
-        List<FavItem> list = getAll();
-        for (FavItem f : list) if (id.equals(f.id)) return;
-        FavItem fi = new FavItem();
-        fi.id=id; fi.name=name; fi.rating=rating; fi.distanceMeters=distance;
-        fi.priceLevel=price; fi.tags=tags; fi.thumbnailUrl=thumb; fi.lat=lat; fi.lng=lng;
-        list.add(fi);
-        prefs.edit().putString(KEY, gson.toJson(list)).apply();
+    /* ---------- 內部 ---------- */
+
+    private synchronized void saveAll(@NonNull List<FavItem> list) {
+        JSONArray arr = new JSONArray();
+        for (FavItem it : list) {
+            if (it == null) continue;
+            arr.put(toJson(it));
+        }
+        sp.edit().putString(KEY_LIST, arr.toString()).apply();
+    }
+
+    private int indexOf(List<FavItem> list, String id) {
+        if (list == null) return -1;
+        for (int i = 0; i < list.size(); i++) {
+            FavItem it = list.get(i);
+            if (it != null && it.id != null && it.id.equals(id)) return i;
+        }
+        return -1;
+    }
+
+    private static JSONObject toJson(@NonNull FavItem it) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("id", it.id);
+            o.put("name", it.name);
+            o.put("lat", it.lat);
+            o.put("lng", it.lng);
+            if (it.rating != null) o.put("rating", it.rating); else o.put("rating", JSONObject.NULL);
+            if (it.distanceMeters != null) o.put("distanceMeters", it.distanceMeters); else o.put("distanceMeters", JSONObject.NULL);
+            if (it.priceLevel != null) o.put("priceLevel", it.priceLevel); else o.put("priceLevel", JSONObject.NULL);
+            o.put("thumbnailUrl", it.thumbnailUrl == null ? JSONObject.NULL : it.thumbnailUrl);
+
+            JSONArray tags = new JSONArray();
+            if (it.tags != null) for (String t : it.tags) tags.put(t);
+            o.put("tags", tags);
+        } catch (Exception ignore) {}
+        return o;
+    }
+
+    private static FavItem fromJson(@NonNull JSONObject o) {
+        FavItem it = new FavItem();
+        it.id = o.optString("id", null);
+        it.name = o.optString("name", null);
+        it.lat = o.optDouble("lat", 0d);
+        it.lng = o.optDouble("lng", 0d);
+
+        if (!o.isNull("rating")) it.rating = o.optDouble("rating");
+        if (!o.isNull("distanceMeters")) it.distanceMeters = o.optInt("distanceMeters");
+        if (!o.isNull("priceLevel")) it.priceLevel = o.optInt("priceLevel");
+        it.thumbnailUrl = o.isNull("thumbnailUrl") ? null : o.optString("thumbnailUrl", null);
+
+        JSONArray arr = o.optJSONArray("tags");
+        List<String> tags = new ArrayList<>();
+        if (arr != null) for (int i = 0; i < arr.length(); i++) tags.add(String.valueOf(arr.opt(i)));
+        it.tags = tags;
+
+        return it;
     }
 }

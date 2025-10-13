@@ -57,8 +57,6 @@ public class MainActivity extends AppCompatActivity {
                 switchTab("map", new MapFragment());
             } else if (id == R.id.favorite) {
                 switchTab("fav", new FavoriteFragment());
-            } else if (id == R.id.user) {
-                switchTab("user", new UserFragment());
             }
 
             // 若抽屜開著，順手關閉

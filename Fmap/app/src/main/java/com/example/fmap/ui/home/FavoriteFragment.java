@@ -19,26 +19,15 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.R;
 import com.example.fmap.data.FavoritesStore;
-import com.example.fmap.model.FavItem;
 
 import java.util.ArrayList;
-import java.util.List;
-import com.example.fmap.model.FakeData;
 
 public class FavoriteFragment extends Fragment {
 
     private FavoritesStore store;
     private FavoriteAdapter adapter;
     private TextView empty;
-    private final ActivityResultLauncher<Intent> detailLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getResultCode() == Activity.RESULT_OK) {
-                    adapter.submit(FakeData.fakeFavItems(10)); // 這裡設定 10 筆假資料
-                    updateEmpty();
 
-                }
-            });
-    private boolean pendingReload = false;
     @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_favorite, container, false);
@@ -65,8 +54,7 @@ public class FavoriteFragment extends Fragment {
                     it.putExtra("id", item.id);
                     it.putExtra("name", item.name);
                     it.putExtra("thumb", item.thumbnailUrl);
-                    detailLauncher.launch(it);
-                    if (item.rating != null)   it.putExtra("rating", item.rating);
+                    if (item.rating != null) it.putExtra("rating", item.rating);
                     if (item.distanceMeters != null) it.putExtra("distance", item.distanceMeters);
                     if (item.priceLevel != null) it.putExtra("price", item.priceLevel);
                     it.putStringArrayListExtra("tags",
@@ -78,20 +66,27 @@ public class FavoriteFragment extends Fragment {
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
         rv.setAdapter(adapter);
 
-        // 使用假資料（共用 FakeData）
-        adapter.submit(FakeData.fakeFavItems(10));
-        updateEmpty();
-
-        }
+        reloadFavorites();
+    }
 
     @Override
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
         if (!hidden) {
-            adapter.submit(store.getAll());
-            updateEmpty();
+            reloadFavorites();
         }
     }
+    @Override
+    public void onResume() {
+        super.onResume();
+        reloadFavorites();
+    }
+
+    private void reloadFavorites() {
+        adapter.submit(store.getAll());
+        updateEmpty();
+    }
+
 
     private void updateEmpty() {
         empty.setVisibility(adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);

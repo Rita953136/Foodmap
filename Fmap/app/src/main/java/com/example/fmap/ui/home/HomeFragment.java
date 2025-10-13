@@ -17,7 +17,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.R;
+import com.example.fmap.data.FavoritesStore;
 import com.example.fmap.model.Place;
+import com.example.fmap.model.FavItem;
+import com.example.fmap.model.Swipe;
+
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
@@ -27,13 +31,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 首頁卡片清單（Firestore 非同步，映射 stores_summary 欄位）
+ * 首頁卡片清單
  */
 public class HomeFragment extends Fragment {
 
     private static final String TAG = "HomeFragment";
-    private static final String COLLECTION = "stores_summary"; // Firestore 集合名
-    private static final int PAGE_SIZE = 50;
+    private static final String COLLECTION = "stores_summary";
+    private static final int PAGE_SIZE = 10;
+    private static final int MAX_ITEMS = 10;
 
     // UI
     private RecyclerView rvCards;
@@ -49,6 +54,9 @@ public class HomeFragment extends Fragment {
     private boolean isLoading = false;
     private boolean isEnd = false;
 
+    // 收藏儲存
+    private FavoritesStore favStore;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -60,6 +68,8 @@ public class HomeFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View v, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(v, savedInstanceState);
+
+        favStore = new FavoritesStore(requireContext());
 
         // find views
         rvCards = v.findViewById(R.id.rvCards);
@@ -78,54 +88,52 @@ public class HomeFragment extends Fragment {
             Toast.makeText(requireContext(), p.name, Toast.LENGTH_SHORT).show();
         });
         rvCards.setAdapter(adapter);
-        // === 綁定左右滑動（LIKE / NOPE）===
+
+        // 綁定左右滑動（LIKE / NOPE）
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(
                 new SwipeCallback(adapter, (record, pos) -> {
-                    // 這裡是滑動後回呼，可自行記錄到 Firestore 或 Log
-                    Log.d("Swipe", "店家 " + record.placeId + " → " + record.action);
-                    // 範例：Toast 提示
-                    Toast.makeText(requireContext(),
-                            (record.action == com.example.fmap.model.SwipeAction.LIKE ? "喜歡 👍" : "略過 👎"),
-                            Toast.LENGTH_SHORT).show();
+                    Place p = adapter.getItem(pos);
+
+                    if (record.getAction() == Swipe.Action.LIKE)  {
+                        // 右滑加入收藏（upsert）
+                        FavItem fav = new FavItem();
+                        fav.id = p.id;
+                        fav.name = p.name;
+                        fav.thumbnailUrl = p.photoUrl;
+                        fav.rating = p.rating;
+                        fav.tags = p.tags;
+                        // 若 Firestore 目前未存經緯度/距離/價位，可留空或 0
+                        fav.lat = 0;
+                        fav.lng = 0;
+                        fav.distanceMeters = null;
+                        fav.priceLevel = null;
+
+                        favStore.addOrUpdate(fav);
+                        Toast.makeText(requireContext(),
+                                "已加入收藏：" + p.name, Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(requireContext(), "略過", Toast.LENGTH_SHORT).show();
+                    }
+
+                    Log.d("Swipe", "店家 " + record.getPlaceId() + " → " + record.getAction());
+                    if (adapter.getItemCount() == 0) {
+                        if (tvEmpty != null) tvEmpty.setText("今日已沒有店家");
+                        if (emptyView != null) emptyView.setVisibility(View.VISIBLE);
+                        if (rvCards != null) rvCards.setVisibility(View.GONE);
+                    }
                 })
         );
         itemTouchHelper.attachToRecyclerView(rvCards);
 
-
         // Firestore
         db = FirebaseFirestore.getInstance();
-
-        // 捲動到底部自動載下一頁
-        rvCards.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
-                if (dy <= 0) return;
-                LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
-                if (lm == null) return;
-                int visible = lm.getChildCount();
-                int total = lm.getItemCount();
-                int first = lm.findFirstVisibleItemPosition();
-                if (!isLoading && !isEnd && (first + visible) >= (total - 6)) {
-                    loadNextPage();
-                }
-            }
-        });
-
-        // 初次載入
         loadFirstPage();
 
-        // 這兩個按鈕依需求實作
-        btnGoSearch.setOnClickListener(btn ->
-                Toast.makeText(requireContext(), "前往搜尋（TODO）", Toast.LENGTH_SHORT).show());
-        btnDevReset.setOnClickListener(btn ->
-                Toast.makeText(requireContext(), "重置額度（TODO）", Toast.LENGTH_SHORT).show());
     }
 
     private void loadFirstPage() {
         isEnd = false;
         lastDoc = null;
-        // 如需先清空畫面再載入，可解開下一行
-        // adapter.submit(new ArrayList<>());
         queryPage(null);
     }
 
@@ -134,7 +142,7 @@ public class HomeFragment extends Fragment {
         queryPage(lastDoc);
     }
 
-    /** 執行一次分頁查詢（依 rating DESC，可自行更換排序欄位） */
+    /** 執行一次分頁查詢 */
     private void queryPage(@Nullable DocumentSnapshot startAfter) {
         isLoading = true;
 
@@ -148,21 +156,16 @@ public class HomeFragment extends Fragment {
                 .addOnFailureListener(this::onLoadFailed);
     }
 
-    /** 將 Firestore 文件手動映射到 Place，安全解析欄位型別 */
     private void onPageLoaded(QuerySnapshot snap) {
         isLoading = false;
-
-        Log.d(TAG, "載入筆數 = " + snap.size());
         List<Place> newList = new ArrayList<>();
-
         for (DocumentSnapshot d : snap.getDocuments()) {
             Place p = new Place();
             p.id = d.getId();
             p.name = d.getString("name");
-            p.photoUrl = d.getString("photo_url");  // 對應 photo_url
-            p.introLine = d.getString("intro");     // 對應 intro
+            p.photoUrl = d.getString("photo_url");
+            p.introLine = d.getString("intro");
 
-            // rating 可能是 Number 或 String，安全解析
             Object ratingObj = d.get("rating");
             double ratingVal = 0d;
             if (ratingObj instanceof Number) {
@@ -173,7 +176,6 @@ public class HomeFragment extends Fragment {
             }
             p.rating = ratingVal;
 
-            // tags_top3 解析為 List<String>
             List<String> tags = new ArrayList<>();
             Object rawTags = d.get("tags_top3");
             if (rawTags instanceof List) {
@@ -186,22 +188,29 @@ public class HomeFragment extends Fragment {
             newList.add(p);
         }
 
-        // 分頁游標
-        if (snap.isEmpty()) {
-            isEnd = true;
-        } else {
-            lastDoc = snap.getDocuments().get(snap.size() - 1);
-        }
+        // 直接標記已到結尾
+        isEnd = true;
 
-        // 合併舊資料 + 新資料
+        // 合併
         List<Place> merged = new ArrayList<>();
         for (int i = 0; i < adapter.getItemCount(); i++) {
             merged.add(adapter.getItem(i));
         }
         merged.addAll(newList);
+
+        // 保留前 10 筆
+        if (merged.size() > MAX_ITEMS) {
+            merged = new ArrayList<>(merged.subList(0, MAX_ITEMS));
+        }
+
+        // 先算好要不要顯示空狀態，再提交
+        final boolean isEmpty = merged.isEmpty();
+
         adapter.submit(merged);
 
-        toggleEmpty(adapter.getItemCount() == 0);
+        // 用剛剛算好的 isEmpty 來切換
+        toggleEmpty(isEmpty);
+
     }
 
     private void onLoadFailed(Exception e) {
