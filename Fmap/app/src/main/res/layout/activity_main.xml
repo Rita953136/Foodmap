@@ -60,11 +60,13 @@
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:background="@android:color/white"
-        app:itemTextColor="@android:color/black"
-        app:itemIconTint="@android:color/black"
-        app:itemHorizontalPadding="16dp"
-        app:itemVerticalPadding="4dp"
+        app:itemTextAppearance="@style/NavigationViewCheckText"
+        app:itemHorizontalPadding="12dp"
+        app:itemVerticalPadding="2dp"
+        app:itemIconPadding="8dp"
+        app:itemIconTint="@null"
         app:headerLayout="@layout/nav_header"
         app:menu="@menu/nav_menu" />
+
 
 </androidx.drawerlayout.widget.DrawerLayout>

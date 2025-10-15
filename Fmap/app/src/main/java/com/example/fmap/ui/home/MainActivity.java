@@ -10,9 +10,9 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.example.fmap.R;
-import com.example.fmap.data.MockPlacesRepository;
 import com.example.fmap.data.RepositoryProvider;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;
@@ -22,13 +22,11 @@ public class MainActivity extends AppCompatActivity {
     private DrawerLayout drawerLayout;        // 抽屜只當「標籤選單容器」
     private NavigationView navView;           // menu/nav_menu：可勾選的標籤
     private BottomNavigationView bottomNav;   // menu/bottom_menu：home/map/favorite/user
+    private HomeViewModel homeVM;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // 資料來源（沿用 mock）
-        RepositoryProvider.init(new MockPlacesRepository(getAssets()));
         setContentView(R.layout.activity_main);
 
         // Toolbar + Drawer（僅提供開關抽屜）

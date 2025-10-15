@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:fontFamily="sans-serif-medium"
-        android:text="標籤"
+        android:text="我的標籤"
         android:textColor="@android:color/black"
         android:textSize="22sp" />
 

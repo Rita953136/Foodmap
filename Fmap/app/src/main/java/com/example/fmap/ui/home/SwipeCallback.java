@@ -9,21 +9,20 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.model.Place;
-import com.example.fmap.model.SwipeAction;
-import com.example.fmap.model.SwipeRecord;
+import com.example.fmap.model.Swipe;  // << 新增：改用單檔 Swipe
 
 /**
  * 左右滑卡片的 Callback：
  *  - 右滑：LIKE；左滑：NOPE
  *  - 滑動中同步顯示 badgeLike / badgeNope
- *  - 放手超過門檻：回調一筆 SwipeRecord 並移除卡片
+ *  - 放手超過門檻：回調一筆 Swipe 並移除卡片
  *  - 放手未達門檻：卡片回彈、貼紙隱藏
  */
 public class SwipeCallback extends ItemTouchHelper.SimpleCallback {
 
     /** 外部可實作此介面取得滑動紀錄（寫入本地或 Firestore） */
     public interface OnRecordListener {
-        void onRecorded(@NonNull SwipeRecord record, int adapterPosition);
+        void onRecorded(@NonNull Swipe record, int adapterPosition); // << 型別改成 Swipe
     }
 
     // ---- 可調參數 ----
@@ -59,12 +58,15 @@ public class SwipeCallback extends ItemTouchHelper.SimpleCallback {
         if (pos == RecyclerView.NO_POSITION) return;
 
         Place p = adapter.getItem(pos);
-        SwipeAction action = (direction == ItemTouchHelper.RIGHT)
-                ? SwipeAction.LIKE : SwipeAction.NOPE;
+        Swipe.Action action = (direction == ItemTouchHelper.RIGHT)
+                ? Swipe.Action.LIKE : Swipe.Action.NOPE;   // << 改用 Swipe.Action
 
         // 回報一筆滑動紀錄
         if (listener != null && p != null) {
-            listener.onRecorded(new SwipeRecord(p.id, action, System.currentTimeMillis()), pos);
+            listener.onRecorded(
+                    new Swipe(p.id, action, System.currentTimeMillis()), // << 建立 Swipe
+                    pos
+            );
         }
 
         // 預設：移除卡片；若只想回彈請改成 notifyItemChanged(pos)
