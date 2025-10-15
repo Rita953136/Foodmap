@@ -17,16 +17,10 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.R;
-import com.example.fmap.data.FavoritesStore;
-import com.example.fmap.model.FavItem;
 import com.example.fmap.model.Place;
 import com.example.fmap.model.Swipe;
 
-import java.util.List;
-
-/**
- * 首頁卡片清單
- */
+//home card
 public class HomeFragment extends Fragment {
 
     private static final String TAG = "HomeFragment";
@@ -53,8 +47,8 @@ public class HomeFragment extends Fragment {
     public void onViewCreated(@NonNull View v, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(v, savedInstanceState);
 
-        // Initialize ViewModel
-        homeViewModel = new ViewModelProvider(this).get(HomeViewModel.class);
+        // Initialize
+        homeViewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
 
         // find views
         rvCards = v.findViewById(R.id.rvCards);
@@ -64,10 +58,6 @@ public class HomeFragment extends Fragment {
         setupRecyclerView();
         observeViewModel();
 
-        // Load data if not already loaded
-        if (homeViewModel.getPlaces().getValue() == null) {
-            homeViewModel.loadPlaces();
-        }
     }
 
     private void setupRecyclerView() {
@@ -81,7 +71,7 @@ public class HomeFragment extends Fragment {
         });
         rvCards.setAdapter(adapter);
 
-        // Attach swipe-to-like/dislike functionality
+        // like/dislike
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(
                 new SwipeCallback(adapter, this::handleSwipeAction)
         );
@@ -89,18 +79,13 @@ public class HomeFragment extends Fragment {
     }
 
     private void observeViewModel() {
-        // Observe places data
+        // places data
         homeViewModel.getPlaces().observe(getViewLifecycleOwner(), places -> {
             adapter.submit(places);
             toggleEmpty(places.isEmpty());
         });
 
-        // Observe loading status
-        homeViewModel.getIsLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            // You can show/hide a progress bar here if you have one
-        });
-
-        // Observe errors
+        // errors
         homeViewModel.getError().observe(getViewLifecycleOwner(), error -> {
             if (error != null && !error.isEmpty()) {
                 Log.e(TAG, "讀取失敗: " + error);
@@ -108,30 +93,21 @@ public class HomeFragment extends Fragment {
                 toggleEmpty(adapter.getItemCount() == 0);
             }
         });
-
-        // Observe empty state message
-        homeViewModel.getEmptyMessage().observe(getViewLifecycleOwner(), message -> {
-            if (tvEmpty != null) {
-                tvEmpty.setText(message);
-            }
-        });
     }
     private void handleSwipeAction(Swipe swipe, int pos) {
         Place p = adapter.getItem(pos);
         if (swipe.getAction() == Swipe.Action.LIKE) {
             homeViewModel.addToFavorites(p);
-            Toast.makeText(requireContext(), "已加入收藏：" + p.name, Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Like：" + p.name, Toast.LENGTH_SHORT).show();
         } else {
-            Toast.makeText(requireContext(), "略過", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Dislike", Toast.LENGTH_SHORT).show();
         }
-
         Log.d("Swipe", "店家 " + swipe.getPlaceId() + " → " + swipe.getAction());
 
         if (adapter.getItemCount() == 0) {
             homeViewModel.setNoMorePlacesMessage();
         }
     }
-
 
     private void toggleEmpty(boolean show) {
         if (emptyView != null) emptyView.setVisibility(show ? View.VISIBLE : View.GONE);

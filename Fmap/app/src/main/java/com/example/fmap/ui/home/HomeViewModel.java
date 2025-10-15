@@ -16,13 +16,13 @@ import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 public class HomeViewModel extends AndroidViewModel {
 
     private static final String COLLECTION = "stores_summary";
     private static final int MAX_ITEMS = 10;
-
-    // LiveData for UI
     private final MutableLiveData<List<Place>> places = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> error = new MutableLiveData<>();
@@ -72,6 +72,42 @@ public class HomeViewModel extends AndroidViewModel {
                 .addOnFailureListener(this::onLoadFailed);
     }
 
+    /** 依多選標籤篩選 */
+    public void applyTagFilter(@NonNull List<String> tags) {
+        // 去重、去空字串、保留順序
+        List<String> cleaned = sanitizeTags(tags);
+
+        if (cleaned.isEmpty()) {
+            loadPlaces();           // 預設熱門清單
+            return;
+        }
+
+        if (Boolean.TRUE.equals(isLoading.getValue())) return;
+        isLoading.setValue(true);
+        error.setValue(null);       // 清掉舊錯誤（可選）
+
+        Query q = db.collection(COLLECTION)
+                .whereArrayContainsAny("tags_top3", cleaned) // <= 最多 10 個
+                .orderBy("rating", Query.Direction.DESCENDING)
+                .limit(MAX_ITEMS);
+
+        q.get()
+                .addOnSuccessListener(this::onPageLoaded)
+                .addOnFailureListener(this::onLoadFailed);
+    }
+
+    /** 去掉空字串、去重、最多取 10 個*/
+    private List<String> sanitizeTags(List<String> input) {
+        if (input == null || input.isEmpty()) return Collections.emptyList();
+        Set<String> set = new LinkedHashSet<>();
+        for (String s : input) {
+            if (s == null) continue;
+            String t = s.trim();
+            if (!t.isEmpty()) set.add(t);
+            if (set.size() == 10) break; // whereArrayContainsAny 上限
+        }
+        return new ArrayList<>(set);
+    }
     private void onPageLoaded(QuerySnapshot snap) {
         List<Place> newList = new ArrayList<>();
         for (DocumentSnapshot d : snap.getDocuments()) {
@@ -82,8 +118,6 @@ public class HomeViewModel extends AndroidViewModel {
                     newList.add(p);
                 }
             } catch (Exception e) {
-                // Log if a specific document fails to parse
-                // This makes your app more robust if one document has bad data
                 error.setValue("無法解析店家資料: " + d.getId());
             }
         }
@@ -103,7 +137,6 @@ public class HomeViewModel extends AndroidViewModel {
         fav.thumbnailUrl = p.photoUrl;
         fav.rating = p.rating;
         fav.tags = p.tags;
-        // The rest of the fields are default null/0
         favStore.addOrUpdate(fav);
     }
 }
