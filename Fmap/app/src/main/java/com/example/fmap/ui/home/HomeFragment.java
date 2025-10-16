@@ -47,6 +47,11 @@ public class HomeFragment extends Fragment {
     public void onViewCreated(@NonNull View v, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(v, savedInstanceState);
 
+        // 通知 MainActivity 更新 Toolbar，確保標題和日期正確
+        if (requireActivity() instanceof MainActivity) {
+            ((MainActivity) requireActivity()).setHomeToolbar();
+        }
+
         // Initialize
         homeViewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
 
@@ -58,6 +63,9 @@ public class HomeFragment extends Fragment {
         setupRecyclerView();
         observeViewModel();
 
+        // ✨ --- 關鍵修正：觸發資料載入 --- ✨
+        // 在所有設定完成後，命令 ViewModel 載入店家資料
+        homeViewModel.loadPlaces();
     }
 
     private void setupRecyclerView() {
@@ -81,8 +89,10 @@ public class HomeFragment extends Fragment {
     private void observeViewModel() {
         // places data
         homeViewModel.getPlaces().observe(getViewLifecycleOwner(), places -> {
-            adapter.submit(places);
-            toggleEmpty(places.isEmpty());
+            if (places != null) { // 增加 null 檢查
+                adapter.submit(places);
+                toggleEmpty(places.isEmpty());
+            }
         });
 
         // errors
@@ -93,17 +103,27 @@ public class HomeFragment extends Fragment {
                 toggleEmpty(adapter.getItemCount() == 0);
             }
         });
+
+        // 觀察空訊息的變化
+        homeViewModel.getEmptyMessage().observe(getViewLifecycleOwner(), message -> {
+            if (tvEmpty != null && message != null) {
+                tvEmpty.setText(message);
+            }
+        });
     }
+
     private void handleSwipeAction(Swipe swipe, int pos) {
         Place p = adapter.getItem(pos);
         if (swipe.getAction() == Swipe.Action.LIKE) {
             homeViewModel.addToFavorites(p);
             Toast.makeText(requireContext(), "Like：" + p.name, Toast.LENGTH_SHORT).show();
         } else {
+            homeViewModel.addToDislikes(p);
             Toast.makeText(requireContext(), "Dislike", Toast.LENGTH_SHORT).show();
         }
         Log.d("Swipe", "店家 " + swipe.getPlaceId() + " → " + swipe.getAction());
 
+        // 檢查列表是否滑完
         if (adapter.getItemCount() == 0) {
             homeViewModel.setNoMorePlacesMessage();
         }

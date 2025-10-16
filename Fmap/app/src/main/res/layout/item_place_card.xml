@@ -110,7 +110,7 @@
             android:padding="10dp"
             android:text="LIKE"
             android:textColor="@android:color/white"
-            android:textSize="25sp"
+            android:textSize="30sp"
             android:textStyle="bold" />
 
         <TextView

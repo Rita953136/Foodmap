@@ -1,9 +1,13 @@
 package com.example.fmap.ui.home;
 
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,124 +24,206 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
-    private DrawerLayout drawerLayout;        // 側邊抽屜
-    private ChipGroup chipGroup;              // 標籤過濾
-    private BottomNavigationView bottomNav;   // 底部導覽列
+    private DrawerLayout drawerLayout;
+    private BottomNavigationView bottomNav;
     private HomeViewModel homeVM;
+    private Toolbar toolbar;
+    private ActionBarDrawerToggle toggle;
+
+    private TextView tvTitle;
+    private TextView tvDate;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // 設定 Toolbar 與抽屜開關
-        Toolbar toolbar = findViewById(R.id.toolbar);
+        toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayShowTitleEnabled(false);
+        }
+
+        tvTitle = findViewById(R.id.tvTitle);
+        tvDate = findViewById(R.id.tvDate);
+
         drawerLayout = findViewById(R.id.drawer_layout);
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+        toggle = new ActionBarDrawerToggle(
                 this, drawerLayout, toolbar, R.string.open_nav, R.string.close_nav);
         drawerLayout.addDrawerListener(toggle);
         toggle.syncState();
 
-        // 取得 ViewModel
         homeVM = new ViewModelProvider(this).get(HomeViewModel.class);
 
-        // 設定抽屜內的標籤點擊事件
-        View drawerContent = findViewById(R.id.drawer_content);
-        chipGroup = drawerContent.findViewById(R.id.chip_group_tags);
+        setupDrawerChips();
+        setupBottomNav();
 
-        if (chipGroup != null) {
-            chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
-                List<String> selected = new ArrayList<>();
-                if (checkedIds != null) {
-                    for (Integer id : checkedIds) {
-                        Chip c = group.findViewById(id);
-                        if (c != null) selected.add(c.getText().toString().trim());
-                    }
-                }
-                // 套用標籤篩選
-                homeVM.applyTagFilter(selected);
-            });
-            // 預設載入全部
-            homeVM.applyTagFilter(java.util.Collections.emptyList());
-        }
-
-        // 設定底部導覽列點擊事件
-        bottomNav = findViewById(R.id.bottom_nav);
-        bottomNav.setOnItemSelectedListener(item -> {
-            // 避免重複點擊
-            if (bottomNav.getSelectedItemId() == item.getItemId()) return true;
-
-            // 清空返回堆疊
-            FragmentManager fm = getSupportFragmentManager();
-            fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
-
-            int id = item.getItemId();
-            if (id == R.id.home) {
-                switchTab("home", new HomeFragment());
-            } else if (id == R.id.map) {
-                switchTab("map", new MapFragment());
-            } else if (id == R.id.favorite) {
-                switchTab("fav", new FavoriteFragment());
-            }
-
-            // 若抽屜開啟則關閉
-            if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                drawerLayout.closeDrawer(GravityCompat.START);
-            }
-            return true;
-        });
-
-        // 預設顯示首頁
         if (savedInstanceState == null) {
-            switchTab("home", new HomeFragment());
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, new HomeFragment())
+                    .commit();
             bottomNav.setSelectedItemId(R.id.home);
         }
 
-        // 自訂返回按鈕行為
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override public void handleOnBackPressed() {
-                if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                    drawerLayout.closeDrawer(GravityCompat.START);
-                } else {
-                    // 非首頁則返回首頁，否則退出
-                    if (bottomNav.getSelectedItemId() != R.id.home) {
-                        bottomNav.setSelectedItemId(R.id.home);
-                    } else {
-                        setEnabled(false);
-                        MainActivity.super.onBackPressed();
+        setupBackPressLogic();
+
+        // ✨ --- 核心邏輯：監聽 Fragment 變化並自動更新 UI --- ✨
+        getSupportFragmentManager().addOnBackStackChangedListener(() -> {
+            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+
+            // 如果當前是 TrashFragment，禁用抽屜 (這會隱藏漢堡圖示)
+            // 否則 (在 HomeFragment)，啟用抽屜 (這會顯示漢堡圖示)
+            boolean isHome = currentFragment instanceof HomeFragment;
+            setDrawerEnabled(isHome);
+
+            // 同時也可以根據 Fragment 更新 Toolbar 標題
+            if (isHome) {
+                setHomeToolbar(); // 設定主頁的 "Fmap" 和日期標題
+            } else if (currentFragment instanceof TrashFragment) {
+                // 如果需要，可以在這裡設定 TrashFragment 的標題
+                if (getSupportActionBar() != null) {
+                    // 隱藏自訂標題
+                    if (tvTitle != null && tvDate != null) {
+                        tvTitle.setVisibility(View.GONE);
+                        tvDate.setVisibility(View.GONE);
                     }
+                    // 顯示預設標題
+                    getSupportActionBar().setDisplayShowTitleEnabled(true);
                 }
             }
         });
     }
 
-    /** 依 Tag 切換 Fragment */
-    private Fragment switchTab(String tag, Fragment target) {
-        FragmentManager fm = getSupportFragmentManager();
-        FragmentTransaction ft = fm.beginTransaction()
-                .setReorderingAllowed(true);
+    public void setHomeToolbar() {
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayShowTitleEnabled(false);
+        }
+        if (tvTitle != null && tvDate != null) {
+            tvTitle.setVisibility(View.VISIBLE);
+            tvDate.setVisibility(View.VISIBLE);
+            tvTitle.setText(R.string.title_home);
+            SimpleDateFormat sdf = new SimpleDateFormat("M月d日", Locale.TAIWAN);
+            tvDate.setText(sdf.format(new Date()));
+        }
+    }
 
-        // 隱藏所有 Fragment
-        for (Fragment f : fm.getFragments()) {
-            ft.hide(f);
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.action_trash) {
+            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+
+            if (currentFragment instanceof TrashFragment) {
+                getOnBackPressedDispatcher().onBackPressed();
+            } else {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new TrashFragment())
+                        .addToBackStack(null) // 加入返回堆疊
+                        .commit();
+            }
+            return true;
+        } else if (id == android.R.id.home) {
+            getOnBackPressedDispatcher().onBackPressed();
+            return true;
         }
 
-        // 顯示或新增目標 Fragment
-        Fragment existing = fm.findFragmentByTag(tag);
-        Fragment toShow = (existing != null) ? existing : target;
-        if (existing == null) {
-            ft.add(R.id.fragment_container, toShow, tag);
-        } else {
-            ft.show(toShow);
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_home_toolbar, menu);
+        return true;
+    }
+
+    private void setupDrawerChips() {
+        ChipGroup chipGroup = findViewById(R.id.chip_group_tags);
+        if (chipGroup == null) return;
+        chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
+            List<String> selected = new ArrayList<>();
+            for (Integer id : checkedIds) {
+                Chip c = group.findViewById(id);
+                if (c != null) {
+                    selected.add(c.getText().toString().trim());
+                }
+            }
+            homeVM.applyTagFilter(selected);
+            drawerLayout.closeDrawer(GravityCompat.START);
+        });
+    }
+
+    private void setupBottomNav() {
+        bottomNav = findViewById(R.id.bottom_nav);
+        bottomNav.setOnItemSelectedListener(item -> {
+            if (bottomNav.getSelectedItemId() == item.getItemId()) {
+                return false;
+            }
+            Fragment targetFragment = null;
+            int id = item.getItemId();
+            if (id == R.id.home) {
+                targetFragment = new HomeFragment();
+            } else if (id == R.id.map) {
+                targetFragment = new MapFragment();
+            } else if (id == R.id.favorite) {
+                targetFragment = new FavoriteFragment();
+            }
+            if (targetFragment != null) {
+                getSupportFragmentManager().popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, targetFragment)
+                        .setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE)
+                        .commit();
+            }
+            return true;
+        });
+    }
+
+    private void setupBackPressLogic() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    drawerLayout.closeDrawer(GravityCompat.START);
+                } else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                    getSupportFragmentManager().popBackStack();
+                } else if (bottomNav.getSelectedItemId() != R.id.home) {
+                    bottomNav.setSelectedItemId(R.id.home);
+                } else {
+                    finish();
+                }
+            }
+        });
+    }
+
+    /**
+     * 啟用或禁用側邊抽屜和漢堡圖示
+     * @param enabled true 為啟用(顯示漢堡圖示)，false 為禁用 (隱藏漢堡圖示)
+     */
+    public void setDrawerEnabled(boolean enabled) {
+        if (drawerLayout == null || toggle == null) return;
+
+        // 如果啟用，解鎖抽屜；如果禁用，鎖定抽屜
+        int lockMode = enabled ? DrawerLayout.LOCK_MODE_UNLOCKED : DrawerLayout.LOCK_MODE_LOCKED_CLOSED;
+        drawerLayout.setDrawerLockMode(lockMode);
+
+        // 啟用或禁用漢堡圖示
+        toggle.setDrawerIndicatorEnabled(enabled);
+
+        // 如果禁用漢堡圖示，則顯示返回箭頭
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(!enabled);
         }
 
-        ft.commit();
-        return toShow;
+        toggle.syncState();
     }
 }
