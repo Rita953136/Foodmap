@@ -1,5 +1,7 @@
 package com.example.fmap.ui.home;
 
+import android.content.Context;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,133 +14,161 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.example.fmap.R;
-import com.example.fmap.model.FavItem;
+import com.example.fmap.model.Place;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
-public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.VH> {
+/**
+ * 用於顯示收藏店家列表的 RecyclerView Adapter
+ */
+public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.FavoriteViewHolder> {
 
-    public interface OnHeartClick {
-        void onHeart(int position, FavItem item);
+    private final List<Place> favoriteList = new ArrayList<>();
+    private final OnFavoriteClickListener listener;
+    private final Context context;
+
+    /**
+     * 定義點擊事件的介面 (Interface)
+     */
+    public interface OnFavoriteClickListener {
+        void onItemClick(Place place);
+        void onHeartClick(Place place, int position);
     }
 
-    public interface OnItemClick {
-        void onItem(int position, FavItem item);
+    /**
+     * Adapter 的建構子
+     * @param context  Context，用於 Glide
+     * @param listener 點擊事件的監聽器
+     */
+    public FavoriteAdapter(Context context, @NonNull OnFavoriteClickListener listener) {
+        this.context = context.getApplicationContext();
+        this.listener = listener;
     }
 
-    private final List<FavItem> items = new ArrayList<>();
-    private final OnHeartClick cb;
-    private static OnItemClick onItem = null;
-
-    public FavoriteAdapter(OnHeartClick cb, OnItemClick onItem) {
-        this.cb = cb;
-        this.onItem = onItem;
-    }
-
-    public void submit(List<FavItem> list) {
-        items.clear();
-        if (list != null) items.addAll(list);
+    /**
+     * 更新 Adapter 的資料列表
+     * @param newPlaces 新的店家列表
+     */
+    public void submitList(List<Place> newPlaces) {
+        favoriteList.clear();
+        if (newPlaces != null) {
+            favoriteList.addAll(newPlaces);
+        }
+        // 通知 RecyclerView 資料已變更
         notifyDataSetChanged();
     }
 
-    public void removeAt(int position) {
-        if (position < 0 || position >= items.size()) return;
-        items.remove(position);
-        notifyItemRemoved(position);
-        notifyItemRangeChanged(position, items.size() - position);
+    /**
+     * 從列表中移除一個項目
+     * @param position 要移除的項目位置
+     */
+    public void removeItem(int position) {
+        if (position >= 0 && position < favoriteList.size()) {
+            favoriteList.remove(position);
+            notifyItemRemoved(position);
+            notifyItemRangeChanged(position, favoriteList.size()); // 更新後續項目的位置
+        }
     }
 
-    public FavItem getItem(int position) {
-        return items.get(position);
-    }
 
     @NonNull
     @Override
-    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_favorite, parent, false);
-        return new VH(v, cb);
+    public FavoriteViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        // 載入 item_favorite.xml 作為列表項目的佈局
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_favorite, parent, false);
+        return new FavoriteViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull VH holder, int position) {
-        holder.bind(items.get(position));
+    public void onBindViewHolder(@NonNull FavoriteViewHolder holder, int position) {
+        // 取得目前位置的店家資料
+        Place currentPlace = favoriteList.get(position);
+        // 綁定資料到 View 上
+        holder.bind(currentPlace, context, listener);
     }
 
     @Override
     public int getItemCount() {
-        return items.size();
+        return favoriteList.size();
     }
 
-    static class VH extends RecyclerView.ViewHolder {
-        ImageView img;
-        TextView name;
-        TextView meta;
-        TextView tags;
-        ImageButton heart;
-        OnHeartClick cb;
 
-        VH(@NonNull View v, OnHeartClick cb) {
-            super(v);
-            this.cb = cb;
-            img = v.findViewById(R.id.imgThumb);
-            name = v.findViewById(R.id.tvName);
-            meta = v.findViewById(R.id.tvMeta);
-            tags = v.findViewById(R.id.tvTags);
-            heart = v.findViewById(R.id.btnHeart);
+    /**
+     * ViewHolder 類別，負責管理 item_favorite.xml 中的所有 View
+     */
+    static class FavoriteViewHolder extends RecyclerView.ViewHolder {
+        // 對應 item_favorite.xml 中的所有 View
+        private final ImageView imgThumb;
+        private final TextView tvName;
+        private final TextView tvMeta;
+        private final TextView tvTags;
+        private final ImageButton btnHeart;
+
+        public FavoriteViewHolder(@NonNull View itemView) {
+            super(itemView);
+            // 初始化 View
+            imgThumb = itemView.findViewById(R.id.imgThumb);
+            tvName = itemView.findViewById(R.id.tvName);
+            tvMeta = itemView.findViewById(R.id.tvMeta);
+            tvTags = itemView.findViewById(R.id.tvTags);
+            btnHeart = itemView.findViewById(R.id.btnHeart);
         }
 
-        void bind(FavItem p) {
-            name.setText(p.name != null ? p.name : "");
+        /**
+         * 將 Place 物件的資料綁定到 UI 上
+         */
+        public void bind(final Place place, Context context, final OnFavoriteClickListener listener) {
+            // 設定店家名稱
+            tvName.setText(place.name);
 
-            // --- 安全處理 meta 欄位 ---
-            // 處理價位：<=0 或 null 都視為無價位
-            int level = (p.priceLevel == null || p.priceLevel <= 0) ? 0 : p.priceLevel;
-            String price;
-            if (level == 0) {
-                price = "-";
-            } else {
-                char[] dollars = new char[level];
-                java.util.Arrays.fill(dollars, '$');
-                price = new String(dollars);
+            // 設定評分和地址等元資訊
+            String metaText = "";
+            if (place.rating != null && place.rating > 0) {
+                metaText = String.format(Locale.getDefault(), "%.1f ★", place.rating);
             }
-
-            String rating = (p.rating != null && p.rating >= 0) ? String.valueOf(p.rating) : "-";
-            String dist = (p.distanceMeters != null && p.distanceMeters > 0) ? (" · " + p.distanceMeters + "m") : "";
-
-            meta.setText("★ " + rating + " · " + price + dist);
-
-            if (p.tags != null && !p.tags.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < Math.min(3, p.tags.size()); i++) {
-                    if (i > 0) sb.append("  •  ");
-                    sb.append(p.tags.get(i));
+            if (place.address != null && !place.address.isEmpty()) {
+                // 如果已有評分，加上分隔符號
+                if (!metaText.isEmpty()) {
+                    metaText += " ・ ";
                 }
-                tags.setText(sb.toString());
+                metaText += place.address;
+            }
+            tvMeta.setText(metaText);
+            tvMeta.setVisibility(metaText.isEmpty() ? View.GONE : View.VISIBLE);
+
+
+            // 設定標籤
+            if (place.tags != null && !place.tags.isEmpty()) {
+                tvTags.setText("#" + TextUtils.join(" #", place.tags));
+                tvTags.setVisibility(View.VISIBLE);
             } else {
-                tags.setText("");
+                tvTags.setVisibility(View.GONE);
             }
 
-            if (p.thumbnailUrl != null && !p.thumbnailUrl.isEmpty()) {
-                Glide.with(img.getContext()).load(p.thumbnailUrl).into(img);
-            } else {
-                img.setImageDrawable(null);
-            }
+            // 使用 Glide 載入圖片
+            Glide.with(context)
+                    .load(place.photoUrl)
+                    .centerCrop()
+                    .placeholder(R.color.material_dynamic_neutral80) // 預設的灰色背景
+                    .error(R.color.material_dynamic_neutral80) // 載入失敗時的背景
+                    .into(imgThumb);
 
-            // 右側愛心（取消收藏）
-            heart.setImageResource(R.drawable.ic_favorite_filled);
-            heart.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION && cb != null) cb.onHeart(pos, p);
+            // 設定整個項目的點擊監聽器
+            itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onItemClick(place);
+                }
             });
 
-            // 點整列進詳細
-            itemView.setOnClickListener(v -> {
-                int pos = getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION && cb != null && onItem != null)
-                    onItem.onItem(pos, p);
+            // 設定愛心按鈕的點擊監聽器
+            btnHeart.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onHeartClick(place, getBindingAdapterPosition());
+                }
             });
         }
-
     }
 }

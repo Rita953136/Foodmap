@@ -7,7 +7,7 @@
     <TextView
         android:id="@+id/tvEmpty"
         android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:text="垃圾桶是空的"
+        android:text="~~~~~~~~~~~~~~是空的喔~~~~~~~~~~~~~~"
         android:textStyle="bold" android:textSize="16sp"
         android:visibility="gone"
         android:layout_marginBottom="8dp"/>

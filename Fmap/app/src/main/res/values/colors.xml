@@ -9,6 +9,9 @@
     <color name="white">#FFFFFFFF</color>
     <color name="lavender">#8692f7</color>
     <color name="grey">#B3B1B1</color>
-
+    <color name="material_dynamic_neutral90">#E0E0E0</color>
+    <color name="material_dynamic_neutral95">#E0E0E0</color>
+    <color name="material_dynamic_neutral70">#B0B0B0</color>
+    <color name="material_dynamic_neutral80">#E0E0E0</color>
 
 </resources>

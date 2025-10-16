@@ -59,6 +59,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
     implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
+    implementation("com.google.android.material:material:1.12.0")
 
     // --- Google Maps & Google Sign-In (Auth) ---
     implementation("com.google.android.gms:play-services-maps:18.2.0")

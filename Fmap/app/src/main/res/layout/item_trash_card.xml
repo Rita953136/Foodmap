@@ -101,24 +101,40 @@
                 android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
-                <Button
-                    android:id="@+id/btnRestore"
-                    android:layout_width="wrap_content"
+                <!-- 第三行：操作（垃圾桶專用） -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="8dp"
-                    android:text="還原"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="8dp">
 
-                <Button
-                    android:id="@+id/btnDelete"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:padding="8dp"
-                    android:text="刪除"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold" />
+                    <!-- 左邊：還原 -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnRestore"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="還原"
+                        android:textColor="#000000"
+                        android:textStyle="bold"
+                        android:backgroundTint="#EDEDED"
+                        app:cornerRadius="12dp"
+                        android:paddingHorizontal="20dp"
+                        android:layout_alignParentStart="true" />
+
+                    <!-- 右邊：刪除 -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnDelete"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="刪除"
+                        android:textColor="#000000"
+                        android:textStyle="bold"
+                        android:backgroundTint="#EDEDED"
+                        app:cornerRadius="12dp"
+                        android:paddingHorizontal="20dp"
+                        android:layout_alignParentEnd="true" />
+
+                </RelativeLayout>
+
 
             </LinearLayout>
         </LinearLayout>

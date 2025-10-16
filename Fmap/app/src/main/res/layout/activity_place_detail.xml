@@ -1,74 +1,147 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bottom_sheet_background"
+    android:paddingBottom="24dp">
 
+    <!-- 拖曳小橫條 -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bottom_sheet_drag_handle" />
+
+    <!-- 頂部大圖 -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/imgThumb"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:scaleType="centerCrop"
+        android:contentDescription="@string/app_name"
+        android:background="@color/material_dynamic_neutral90"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.LargeComponent"
+        tools:src="@tools:sample/backgrounds/scenic" />
+
+    <!-- 店家資訊：名稱 + 類別/營業資訊 -->
     <LinearLayout
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp">
 
-        <LinearLayout
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="end">
-
-            <ImageButton
-                android:id="@+id/btntomap"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="end|bottom"
-                android:layout_margin="12dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/app_name"
-                android:src="@drawable/outline_map_search_24" />
-
-            <ImageButton
-                android:id="@+id/btnHeart"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="end|bottom"
-                android:layout_margin="12dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/app_name"
-                android:src="@drawable/ic_favorite_filled" />
-
-            <ImageButton
-                android:id="@+id/btnClose"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="end|bottom"
-                android:layout_margin="12dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/app_name"
-                android:src="@drawable/outline_close_24" />
-
-        </LinearLayout>
-
-        <FrameLayout
-            android:layout_width="match_parent" android:layout_height="220dp">
-            <ImageView
-                android:id="@+id/imgHeader"
-                android:layout_width="match_parent" android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:background="@android:color/darker_gray"/>
-
-        </FrameLayout>
-
+        <!-- 店家名稱 -->
         <TextView
             android:id="@+id/tvName"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:textSize="22sp" android:textStyle="bold"
-            android:paddingStart="16dp" android:paddingTop="12dp" android:paddingEnd="16dp"/>
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/black"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end"
+            tools:text="拾飯 日式料理・丼飯・壽司・刺身（最後點餐時間中午13:50、晚上20:50）" />
 
+        <!-- 評分區 -->
+        <LinearLayout
+            android:id="@+id/layoutRating"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="16dp">
+
+            <RatingBar
+                android:id="@+id/ratingBar"
+                style="?attr/ratingBarStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:isIndicator="true"
+                android:numStars="5"
+                android:paddingStart="0dp"
+                android:rating="4.6"
+                android:stepSize="0.5" />
+
+            <TextView
+                android:id="@+id/tvRating"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textColor="@android:color/black"
+                android:textSize="14sp"
+                tools:text="4.6" />
+        </LinearLayout>
+
+        <!-- 店家標籤 ChipGroup（由程式動態加入） -->
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_tags"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="16dp"
+            app:singleLine="true"
+            app:chipSpacingHorizontal="8dp"
+            app:chipSpacingVertical="4dp" />
+
+        <!-- 類別/店型或簡介 -->
         <TextView
             android:id="@+id/tvMeta"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="#8A8A8E"
             android:textSize="14sp"
-            android:paddingStart="16dp" android:paddingTop="4dp" android:paddingEnd="16dp"/>
-
-        <TextView
-            android:id="@+id/tvTags"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:paddingStart="16dp" android:paddingTop="8dp" android:paddingEnd="16dp" android:paddingBottom="16dp"/>
+            tools:text="壽司店・可外送" />
     </LinearLayout>
-</ScrollView>
+
+    <!-- 分隔線 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="#E5E5EA" />
+
+    <!-- 功能按鈕 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp"
+        android:gravity="center">
+
+        <!-- ✨ 核心修改：將 <Button> 改為 <com.google.android.material.button.MaterialButton> -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnHeart"
+            style="@style/Widget.Material3.Button.TextButton.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:textColor="@color/black"
+            app:icon="@drawable/outline_favorite_24"
+            app:iconTint="@color/black" />
+
+        <!-- ✨ 核心修改：將 <Button> 改為 <com.google.android.material.button.MaterialButton> -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNavigate"
+            style="@style/Widget.Material3.Button.TextButton.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            app:icon="@drawable/outline_map_search_24"
+            app:iconTint="@color/black" />
+
+    </LinearLayout>
+
+</LinearLayout>

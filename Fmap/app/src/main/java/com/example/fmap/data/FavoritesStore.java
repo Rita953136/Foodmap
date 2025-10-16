@@ -3,132 +3,120 @@ package com.example.fmap.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import androidx.annotation.NonNull;
+import com.example.fmap.model.Place;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
-import com.example.fmap.model.FavItem;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
-
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-/** 本機收藏（SharedPreferences JSON 持久化） */
-public class FavoritesStore {
+/**
+ * 管理收藏店家的本地儲存（SharedPreferences）
+ * Singleton：請用 getInstance(context) 取得；建構子為 private。
+ */
+public final class FavoritesStore {
 
-    private static final String PREF = "favorites_store_v1";
-    private static final String KEY_LIST = "fav_list";
-    private final SharedPreferences sp;
+    private static volatile FavoritesStore INSTANCE;
+    private final SharedPreferences prefs;
+    private final Gson gson = new Gson();
 
-    public FavoritesStore(@NonNull Context ctx) {
-        this.sp = ctx.getApplicationContext().getSharedPreferences(PREF, Context.MODE_PRIVATE);
+    private static final String PREF_NAME = "favorites_store";
+    private static final String KEY_FAVORITES = "favorites_list";
+
+    private FavoritesStore(Context context) {
+        Context app = context.getApplicationContext();
+        prefs = app.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
     }
 
-    /* ---------- 對外 API ---------- */
-
-    /** Upsert：存在就更新，不存在就新增（以 id 為 key） */
-    public synchronized void addOrUpdate(@NonNull FavItem item) {
-        if (item.id == null || item.id.isEmpty()) return;
-        List<FavItem> all = getAll();
-        int idx = indexOf(all, item.id);
-        if (idx >= 0) all.set(idx, item);
-        else all.add(0, item); // 新加入放最上
-        saveAll(all);
-    }
-
-    /** 新增（不判重） */
-    public synchronized void add(@NonNull FavItem item) {
-        List<FavItem> all = getAll();
-        all.add(0, item);
-        saveAll(all);
-    }
-
-    public synchronized void remove(@NonNull String id) {
-        List<FavItem> all = getAll();
-        int idx = indexOf(all, id);
-        if (idx >= 0) {
-            all.remove(idx);
-            saveAll(all);
-        }
-    }
-
-    public synchronized void clear() {
-        sp.edit().remove(KEY_LIST).apply();
-    }
-
-    /** 讀全部收藏（已排序，最新在前） */
-    @NonNull
-    public synchronized List<FavItem> getAll() {
-        String raw = sp.getString(KEY_LIST, null);
-        List<FavItem> out = new ArrayList<>();
-        if (raw == null || raw.isEmpty()) return out;
-
-        try {
-            JSONArray arr = new JSONArray(raw);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.optJSONObject(i);
-                if (o != null) out.add(fromJson(o));
+    public static FavoritesStore getInstance(Context context) {
+        if (INSTANCE == null) {
+            synchronized (FavoritesStore.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = new FavoritesStore(context);
+                }
             }
-        } catch (Exception ignore) { /* 破檔容忍 */ }
-        return out;
-    }
-
-    /* ---------- 內部 ---------- */
-
-    private synchronized void saveAll(@NonNull List<FavItem> list) {
-        JSONArray arr = new JSONArray();
-        for (FavItem it : list) {
-            if (it == null) continue;
-            arr.put(toJson(it));
         }
-        sp.edit().putString(KEY_LIST, arr.toString()).apply();
+        return INSTANCE;
     }
 
-    private int indexOf(List<FavItem> list, String id) {
-        if (list == null) return -1;
+    /** 讀取全部收藏 */
+    public List<Place> getAll() {
+        String json = prefs.getString(KEY_FAVORITES, null);
+        if (json == null) return new ArrayList<>();
+        Type listType = new TypeToken<List<Place>>() {}.getType();
+        List<Place> list = gson.fromJson(json, listType);
+        return list != null ? list : new ArrayList<>();
+    }
+
+    /** 只取所有收藏的 id（給過濾/比對用） */
+    public Set<String> getAllIds() {
+        List<Place> list = getAll();
+        Set<String> ids = new HashSet<>();
+        for (Place p : list) {
+            if (p != null && p.id != null) ids.add(p.id);
+        }
+        return ids;
+    }
+
+    /** 依 id 取得收藏的 Place；找不到回傳 null */
+    public Place get(String id) {
+        if (id == null) return null;
+        for (Place p : getAll()) {
+            if (p != null && id.equals(p.id)) return p;
+        }
+        return null;
+    }
+
+    /** 檢查是否為收藏 */
+    public boolean isFavorite(String id) {
+        if (id == null) return false;
+        for (Place p : getAll()) {
+            if (p != null && id.equals(p.id)) return true;
+        }
+        return false;
+    }
+
+    /** 新增（若已存在相同 id 則忽略） */
+    public void add(Place place) {
+        if (place == null || place.id == null) return;
+        List<Place> list = getAll();
+        for (Place p : list) {
+            if (p != null && place.id.equals(p.id)) return; // 已存在
+        }
+        list.add(place);
+        save(list);
+    }
+
+    /** 新增或更新（若存在相同 id 則覆蓋） */
+    public void addOrUpdate(Place place) {
+        if (place == null || place.id == null) return;
+        List<Place> list = getAll();
+        boolean updated = false;
         for (int i = 0; i < list.size(); i++) {
-            FavItem it = list.get(i);
-            if (it != null && it.id != null && it.id.equals(id)) return i;
+            Place p = list.get(i);
+            if (p != null && place.id.equals(p.id)) {
+                list.set(i, place);
+                updated = true;
+                break;
+            }
         }
-        return -1;
+        if (!updated) list.add(place);
+        save(list);
     }
 
-    private static JSONObject toJson(@NonNull FavItem it) {
-        JSONObject o = new JSONObject();
-        try {
-            o.put("id", it.id);
-            o.put("name", it.name);
-            o.put("lat", it.lat);
-            o.put("lng", it.lng);
-            if (it.rating != null) o.put("rating", it.rating); else o.put("rating", JSONObject.NULL);
-            if (it.distanceMeters != null) o.put("distanceMeters", it.distanceMeters); else o.put("distanceMeters", JSONObject.NULL);
-            if (it.priceLevel != null) o.put("priceLevel", it.priceLevel); else o.put("priceLevel", JSONObject.NULL);
-            o.put("thumbnailUrl", it.thumbnailUrl == null ? JSONObject.NULL : it.thumbnailUrl);
-
-            JSONArray tags = new JSONArray();
-            if (it.tags != null) for (String t : it.tags) tags.put(t);
-            o.put("tags", tags);
-        } catch (Exception ignore) {}
-        return o;
+    /** 依 id 移除收藏 */
+    public void remove(String id) {
+        if (id == null) return;
+        List<Place> list = getAll();
+        list.removeIf(p -> p != null && id.equals(p.id));
+        save(list);
     }
 
-    private static FavItem fromJson(@NonNull JSONObject o) {
-        FavItem it = new FavItem();
-        it.id = o.optString("id", null);
-        it.name = o.optString("name", null);
-        it.lat = o.optDouble("lat", 0d);
-        it.lng = o.optDouble("lng", 0d);
-
-        if (!o.isNull("rating")) it.rating = o.optDouble("rating");
-        if (!o.isNull("distanceMeters")) it.distanceMeters = o.optInt("distanceMeters");
-        if (!o.isNull("priceLevel")) it.priceLevel = o.optInt("priceLevel");
-        it.thumbnailUrl = o.isNull("thumbnailUrl") ? null : o.optString("thumbnailUrl", null);
-
-        JSONArray arr = o.optJSONArray("tags");
-        List<String> tags = new ArrayList<>();
-        if (arr != null) for (int i = 0; i < arr.length(); i++) tags.add(String.valueOf(arr.opt(i)));
-        it.tags = tags;
-
-        return it;
+    /** 寫回 SharedPreferences */
+    private void save(List<Place> list) {
+        prefs.edit().putString(KEY_FAVORITES, gson.toJson(list)).apply();
     }
 }

@@ -9,13 +9,14 @@ public class Place {
     public Double rating;
 
     @PropertyName("tags_top3")
-    public List<String> tags;     // ← 讓 Firestore 的 top3_tags 映射到這個欄位
+    public List<String> tags;
 
     @PropertyName("photo_url")
     public String photoUrl;
 
     @PropertyName("intro")
     public String introLine;
+    public  String address = "台中市西屯區";;
 
     public Place() {}
 }
