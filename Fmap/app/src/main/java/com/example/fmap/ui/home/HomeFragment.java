@@ -98,9 +98,13 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(
                 new SwipeCallback(adapter, (swipeAction, pos) -> {
                     Place swipedPlace = adapter.getItem(pos);
+                    if (swipedPlace == null) return;
+                    adapter.removeAt(pos);
                     homeViewModel.handleSwipeAction(swipeAction, swipedPlace);
-                    if (swipeAction == Swipe.Action.LIKE && swipedPlace != null) {
+                    if (swipeAction == Swipe.Action.LIKE) {
                         Toast.makeText(getContext(), "已收藏：" + swipedPlace.name, Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(getContext(), "已將 " + swipedPlace.name + " 加入不喜歡列表", Toast.LENGTH_SHORT).show();
                     }
                 })
         );

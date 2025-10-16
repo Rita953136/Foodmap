@@ -35,7 +35,6 @@ public class TrashCardAdapter extends ListAdapter<Place, TrashCardAdapter.TrashC
     @Override
     public TrashCardVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
-                // 若你使用 item_disliked_card，改成 R.layout.item_disliked_card
                 .inflate(R.layout.item_trash_card, parent, false);
         return new TrashCardVH(v);
     }
@@ -70,7 +69,7 @@ public class TrashCardAdapter extends ListAdapter<Place, TrashCardAdapter.TrashC
             }
 
             if (p.photoUrl != null && !p.photoUrl.isEmpty()) {
-                // 如果有用 Glide/Picasso：在此載入縮圖
+                // Glide/Picasso
                 // Glide.with(img.getContext()).load(p.photoUrl).into(img);
             } else {
                 img.setImageResource(android.R.color.darker_gray);
@@ -91,7 +90,6 @@ public class TrashCardAdapter extends ListAdapter<Place, TrashCardAdapter.TrashC
 
                 @Override
                 public boolean areContentsTheSame(@NonNull Place oldItem, @NonNull Place newItem) {
-                    // 若 Place 沒有覆寫 equals，逐欄位比對
                     if (!Objects.equals(oldItem.name, newItem.name)) return false;
                     if (!Objects.equals(oldItem.rating, newItem.rating)) return false;
                     if (!Objects.equals(oldItem.photoUrl, newItem.photoUrl)) return false;

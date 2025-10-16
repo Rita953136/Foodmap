@@ -13,12 +13,10 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.fmap.data.FavoritesStore;
 import com.example.fmap.model.Place;
 import com.example.fmap.model.Swipe;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldPath;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
@@ -26,15 +24,16 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
- * Home / Trash 共用 ViewModel
+ * Home / Trash 共用 ViewModel（本機版垃圾桶）
  * 支援多標籤查找：
  *  - ANY：含任一標籤（OR）
  *  - ALL：同時含所有標籤（AND，透過 client-side 過濾）
  *
- * 保留不喜歡使用 SharedPreferences 的作法。
+ * 垃圾桶僅使用 SharedPreferences 儲存不喜歡的店家 ID。
  */
 public class HomeViewModel extends AndroidViewModel {
 
@@ -54,7 +53,7 @@ public class HomeViewModel extends AndroidViewModel {
     private final MutableLiveData<List<String>> selectedTags = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<TagMatchMode> tagMatchMode = new MutableLiveData<>(TagMatchMode.ALL); // 預設 AND
 
-    // Trash
+    // Trash（本機版）
     private final MutableLiveData<List<Place>> dislikedPlaces = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoadingTrash = new MutableLiveData<>(false);
     private final MutableLiveData<String> trashError = new MutableLiveData<>();
@@ -201,49 +200,70 @@ public class HomeViewModel extends AndroidViewModel {
         return new HashSet<>(prefs.getStringSet(DISLIKED_PLACES_KEY, Collections.emptySet()));
     }
 
-    // ---------------- Trash ----------------
+    // ---------------- Trash：用本機 prefs 的 ID 批次撈回 Place ----------------
 
-    public void loadDislikedPlaces() {
+    /** 以 SharedPreferences 的 ID 清單載入垃圾桶列表（每批 10 筆 whereIn(docId)）。 */
+    public void loadDislikedPlacesFromPrefs() {
         isLoadingTrash.setValue(true);
         trashError.setValue(null);
 
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            trashError.setValue("User not logged in.");
+        Set<String> ids = getDislikedIds();
+        if (ids == null || ids.isEmpty()) {
+            dislikedPlaces.setValue(new ArrayList<>());
             isLoadingTrash.setValue(false);
             return;
         }
 
-        db.collection("users").document(user.getUid()).collection("dislikes")
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        List<Place> list = new ArrayList<>();
-                        for (QueryDocumentSnapshot doc : task.getResult()) {
-                            Place p = doc.toObject(Place.class);
-                            p.id = doc.getId();
-                            list.add(p);
+        List<String> idList = new ArrayList<>(ids);
+        final int totalBatches = (idList.size() + 9) / 10;
+        AtomicInteger done = new AtomicInteger(0);
+        List<Place> collected = new ArrayList<>();
+
+        for (int i = 0; i < idList.size(); i += 10) {
+            List<String> batch = idList.subList(i, Math.min(i + 10, idList.size()));
+            db.collection(COLLECTION)
+                    .whereIn(FieldPath.documentId(), batch)
+                    .get()
+                    .addOnSuccessListener(snap -> {
+                        if (snap != null) {
+                            for (DocumentSnapshot d : snap.getDocuments()) {
+                                try {
+                                    Place p = d.toObject(Place.class);
+                                    if (p != null) {
+                                        p.id = d.getId();
+                                        collected.add(p);
+                                    }
+                                } catch (Exception ignore) {}
+                            }
                         }
-                        dislikedPlaces.setValue(list);
-                    } else {
-                        trashError.setValue("Failed to load disliked places: " +
-                                (task.getException() != null ? task.getException().getMessage() : "unknown"));
-                    }
-                    isLoadingTrash.setValue(false);
-                });
+                        if (done.incrementAndGet() == totalBatches) {
+                            dislikedPlaces.setValue(collected);
+                            isLoadingTrash.setValue(false);
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "loadDislikedPlacesFromPrefs batch failed", e);
+                        if (done.incrementAndGet() == totalBatches) {
+                            trashError.setValue("讀取垃圾桶失敗：" + e.getMessage());
+                            dislikedPlaces.setValue(collected);
+                            isLoadingTrash.setValue(false);
+                        }
+                    });
+        }
     }
 
+    /** 復原：從本機 prefs 移除，然後以 prefs 重新載入。 */
     public void removeFromDislikes(String placeId) {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null || placeId == null) {
-            trashError.setValue("Cannot restore item. User not logged in or place ID is missing.");
+        if (placeId == null) {
+            trashError.setValue("Cannot restore item: place ID is missing.");
             return;
         }
 
-        db.collection("users").document(user.getUid())
-                .collection("dislikes").document(placeId)
-                .delete()
-                .addOnSuccessListener(aVoid -> loadDislikedPlaces())
-                .addOnFailureListener(e -> trashError.setValue("Failed to restore item: " + e.getMessage()));
+        Set<String> ids = new HashSet<>(prefs.getStringSet(DISLIKED_PLACES_KEY, Collections.emptySet()));
+        if (ids.remove(placeId)) {
+            prefs.edit().putStringSet(DISLIKED_PLACES_KEY, ids).apply();
+        }
+
+        loadDislikedPlacesFromPrefs();
     }
 }

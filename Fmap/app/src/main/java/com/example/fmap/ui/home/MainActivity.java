@@ -90,7 +90,8 @@ public class MainActivity extends AppCompatActivity {
                         tvTitle.setVisibility(View.GONE);
                         tvDate.setVisibility(View.GONE);
                     }
-                    // 顯示預設標題
+                    getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+                    toggle.setDrawerIndicatorEnabled(false);
                     getSupportActionBar().setDisplayShowTitleEnabled(true);
                 }
             }

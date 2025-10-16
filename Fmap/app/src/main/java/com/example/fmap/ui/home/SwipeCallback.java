@@ -15,8 +15,6 @@ public class SwipeCallback extends ItemTouchHelper.SimpleCallback {
 
     private final PlacesAdapter adapter;
     private final OnSwipedListener listener;
-
-    // ✨ 2. 定義新的監聽器介面，使用 Swipe.Action
     public interface OnSwipedListener {
         void onSwiped(Swipe.Action action, int position);
     }

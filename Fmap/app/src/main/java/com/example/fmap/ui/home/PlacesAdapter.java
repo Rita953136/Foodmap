@@ -106,7 +106,7 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
                     .centerCrop()
                     .into(imgThumb);
 
-            // 點擊事件 
+            // 點擊事件
             itemView.setOnClickListener(v -> {
                 int currentPosition = getBindingAdapterPosition();
                 if (currentPosition != RecyclerView.NO_POSITION) {
