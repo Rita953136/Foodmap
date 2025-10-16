@@ -76,22 +76,16 @@ public class MainActivity extends AppCompatActivity {
 
         setupBackPressLogic();
 
-        // ✨ --- 核心邏輯：監聽 Fragment 變化並自動更新 UI --- ✨
+        // 監聽 Fragment 變化並自動更新 UI
         getSupportFragmentManager().addOnBackStackChangedListener(() -> {
             Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-
-            // 如果當前是 TrashFragment，禁用抽屜 (這會隱藏漢堡圖示)
-            // 否則 (在 HomeFragment)，啟用抽屜 (這會顯示漢堡圖示)
             boolean isHome = currentFragment instanceof HomeFragment;
             setDrawerEnabled(isHome);
 
-            // 同時也可以根據 Fragment 更新 Toolbar 標題
             if (isHome) {
-                setHomeToolbar(); // 設定主頁的 "Fmap" 和日期標題
+                setHomeToolbar();
             } else if (currentFragment instanceof TrashFragment) {
-                // 如果需要，可以在這裡設定 TrashFragment 的標題
                 if (getSupportActionBar() != null) {
-                    // 隱藏自訂標題
                     if (tvTitle != null && tvDate != null) {
                         tvTitle.setVisibility(View.GONE);
                         tvDate.setVisibility(View.GONE);
@@ -158,7 +152,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             homeVM.applyTagFilter(selected);
-            drawerLayout.closeDrawer(GravityCompat.START);
         });
     }
 
@@ -207,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * 啟用或禁用側邊抽屜和漢堡圖示
-     * @param enabled true 為啟用(顯示漢堡圖示)，false 為禁用 (隱藏漢堡圖示)
+     * @param enabled true 為啟用，false 為禁用
      */
     public void setDrawerEnabled(boolean enabled) {
         if (drawerLayout == null || toggle == null) return;

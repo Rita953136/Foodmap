@@ -20,15 +20,10 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
 
     private final List<Place> data = new ArrayList<>();
     private final Context context;
-    // ✨ 1. 新增點擊監聽器介面和成員變數
     private final OnPlaceClickListener clickListener;
-
-    // ✨ 2. 定義點擊監聽器介面
     public interface OnPlaceClickListener {
         void onPlaceClick(Place place);
     }
-
-    // ✨ 3. 修改建構子，要求傳入監聽器
     public PlacesAdapter(Context context, OnPlaceClickListener listener) {
         this.context = context;
         this.clickListener = listener; // 儲存監聽器
@@ -61,7 +56,6 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_place_card, parent, false);
-        // ✨ 4. 將監聽器傳遞給 ViewHolder
         return new VH(v, clickListener);
     }
 
@@ -90,7 +84,6 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
         TextView tvName, tvRating, tvTags;
         TextView like, nope;
 
-        // ✨ 5. ViewHolder 建構子也接收監聽器
         VH(@NonNull View v, OnPlaceClickListener listener) {
             super(v);
             imgThumb = v.findViewById(R.id.imgThumb);
@@ -102,7 +95,6 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
             nope = v.findViewById(R.id.badgeNope);
         }
 
-        // ✨ 6. 新增 bind 方法來綁定資料和點擊事件
         void bind(Place item, Context context) {
             tvName.setText(item.name != null ? item.name : "");
             double ratingVal = item.rating != null ? item.rating : 0d;
@@ -111,15 +103,11 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
 
             Glide.with(context)
                     .load(item.photoUrl)
-                    .placeholder(R.drawable.outline_map_search_24)
-                    .error(R.drawable.outline_map_search_24)
                     .centerCrop()
                     .into(imgThumb);
 
-            // 在這裡設定點擊事件，並透過介面回傳
+            // 點擊事件 
             itemView.setOnClickListener(v -> {
-                // 從 Adapter 中獲取最新的資料物件
-                // 這比直接使用 bind 方法傳入的 item 更安全，因為 ViewHolder 可能被複用
                 int currentPosition = getBindingAdapterPosition();
                 if (currentPosition != RecyclerView.NO_POSITION) {
                     Place clickedPlace = ((PlacesAdapter) getBindingAdapter()).getItem(currentPosition);

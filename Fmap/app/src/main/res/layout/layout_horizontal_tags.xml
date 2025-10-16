@@ -12,7 +12,7 @@
     app:chipSpacingHorizontal="8dp"
     app:chipSpacingVertical="8dp">
 
-    <!-- 🍱 料理風格 -->
+    <!-- 料理風格 -->
     <com.google.android.material.chip.Chip
         style="@style/Widget.Material3.Chip.Assist.Elevated"
         android:layout_width="wrap_content"
@@ -67,16 +67,6 @@
         style="@style/Widget.Material3.Chip.Assist.Elevated"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="港式"
-        android:checkable="true"
-        app:checkedIconVisible="false"
-        app:chipBackgroundColor="@color/chip_bg_selector"
-        android:textColor="@color/chip_text_selector" />
-
-    <com.google.android.material.chip.Chip
-        style="@style/Widget.Material3.Chip.Assist.Elevated"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         android:text="西式"
         android:checkable="true"
         app:checkedIconVisible="false"
@@ -103,7 +93,7 @@
         app:chipBackgroundColor="@color/chip_bg_selector"
         android:textColor="@color/chip_text_selector" />
 
-    <!-- 🍜 食物類別 -->
+    <!-- 食物類別 -->
     <com.google.android.material.chip.Chip
         style="@style/Widget.Material3.Chip.Assist.Elevated"
         android:layout_width="wrap_content"
@@ -200,6 +190,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="飲品"
+        android:checkable="true"
+        app:checkedIconVisible="false"
+        app:chipBackgroundColor="@color/chip_bg_selector"
+        android:textColor="@color/chip_text_selector" />
+
+    <com.google.android.material.chip.Chip
+        style="@style/Widget.Material3.Chip.Assist.Elevated"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="其他"
         android:checkable="true"
         app:checkedIconVisible="false"
         app:chipBackgroundColor="@color/chip_bg_selector"
