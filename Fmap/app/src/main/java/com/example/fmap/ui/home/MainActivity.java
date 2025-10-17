@@ -23,6 +23,7 @@ import com.example.fmap.R;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.example.fmap.ui.home.AiAdvisorFragment;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -127,7 +128,15 @@ public class MainActivity extends AppCompatActivity {
                         .commit();
             }
             return true;
-        } else if (id == android.R.id.home) {
+        }
+        else if (id == R.id.action_ai_advisor) {
+            // 建立並顯示 AiAdvisorFragment
+            AiAdvisorFragment aiFragment = AiAdvisorFragment.newInstance();
+            aiFragment.show(getSupportFragmentManager(), "ai_advisor_dialog"); // 使用 show 方法來顯示 BottomSheet
+            return true; // 表示我們已經處理了這個點擊事件
+
+        }
+        else if (id == android.R.id.home) {
             getOnBackPressedDispatcher().onBackPressed();
             return true;
         }

@@ -13,66 +13,76 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.fmap.data.FavoritesStore;
 import com.example.fmap.model.Place;
 import com.example.fmap.model.Swipe;
+import com.example.fmap.util.OpenAIClient; // ✨ 1. 匯入我們剛剛建立的 OpenAIClient
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldPath;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;    // ✨ 2. 匯入 ExecutorService
+import java.util.concurrent.Executors;      // ✨ 2. 匯入 Executors
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-/**
- * Home / Trash 共用 ViewModel（本機版垃圾桶）
- * 支援多標籤查找：
- *  - ANY：含任一標籤（OR）
- *  - ALL：同時含所有標籤（AND，透過 client-side 過濾）
- *
- * 垃圾桶僅使用 SharedPreferences 儲存不喜歡的店家 ID。
- */
 public class HomeViewModel extends AndroidViewModel {
 
     private static final String TAG = "HomeViewModel";
-    private static final String COLLECTION = "stores_summary"; // Firestore 集合
-    private static final String FIELD_TAGS = "tags_top3";      // Array<String>
-    private static final String FIELD_RATING = "rating";       // Number
-    private static final int MAX_ITEMS = 30;                   // 每次載入數
+    private static final String COLLECTION = "stores_summary";
+    private static final String FIELD_TAGS = "tags_top3";
+    private static final String FIELD_RATING = "rating";
+    private static final int MAX_ITEMS = 30;
 
     public enum TagMatchMode { ANY, ALL }
 
-    // --- UI State ---
+    // --- UI State LiveData ---
     private final MutableLiveData<List<Place>> places = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private final MutableLiveData<String> emptyMessage = new MutableLiveData<>("點擊或滑動卡片來探索");
     private final MutableLiveData<List<String>> selectedTags = new MutableLiveData<>(new ArrayList<>());
-    private final MutableLiveData<TagMatchMode> tagMatchMode = new MutableLiveData<>(TagMatchMode.ALL); // 預設 AND
+    private final MutableLiveData<TagMatchMode> tagMatchMode = new MutableLiveData<>(TagMatchMode.ALL);
 
-    // Trash（本機版）
+    // --- Trash LiveData (本機版) ---
     private final MutableLiveData<List<Place>> dislikedPlaces = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoadingTrash = new MutableLiveData<>(false);
     private final MutableLiveData<String> trashError = new MutableLiveData<>();
 
-    // --- Data sources ---
+    // --- AI Advisor LiveData (保持不變) ---
+    private final MutableLiveData<String> _aiResponse = new MutableLiveData<>();
+    public LiveData<String> aiResponse = _aiResponse;
+    private final MutableLiveData<Boolean> _isAiLoading = new MutableLiveData<>(false);
+    public LiveData<Boolean> isAiLoading = _isAiLoading;
+
+    // --- Data sources & Services ---
     private static final String PREFS_NAME = "FmapUserPrefs";
     private static final String DISLIKED_PLACES_KEY = "disliked_places";
     private final SharedPreferences prefs;
     private final FirebaseFirestore db;
     private final FavoritesStore favStore;
+    private final Gson gson;
+
+    // ✨ 3. 移除 Retrofit，改用 ExecutorService 處理背景任務
+    private final ExecutorService executor;
 
     public HomeViewModel(@NonNull Application app) {
         super(app);
         prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         db = FirebaseFirestore.getInstance();
         favStore = FavoritesStore.getInstance(app.getApplicationContext());
+        gson = new Gson();
+
+        // 初始化單一執行緒的執行緒池
+        executor = Executors.newSingleThreadExecutor();
     }
 
-    // --- LiveData getters ---
+    // --- LiveData Getters (保持不變) ---
     public LiveData<List<Place>> getPlaces() { return places; }
     public LiveData<Boolean> getIsLoading() { return isLoading; }
     public LiveData<String> getError() { return error; }
@@ -83,7 +93,46 @@ public class HomeViewModel extends AndroidViewModel {
     public LiveData<Boolean> getIsLoadingTrash() { return isLoadingTrash; }
     public LiveData<String> getTrashError() { return trashError; }
 
-    // ---------------- Home ----------------
+    // ---------------- AI Recommendation ----------------
+
+    /**
+     * ✨ 4. 【核心修改】修改此方法，使用 OpenAIClient 取得推薦
+     * @param userQuestion 使用者的問題。
+     * @param availablePlaces 當前可用於推薦的店家列表。
+     */
+    public void getAiRecommendation(String userQuestion, List<Place> availablePlaces) {
+        if (Boolean.TRUE.equals(_isAiLoading.getValue())) return;
+
+        _isAiLoading.postValue(true); // 開始載入
+        _aiResponse.postValue("AI 思考中...");
+
+        // 在背景執行緒中執行網路請求
+        executor.execute(() -> {
+            // 將店家列表轉換為 JSON 字串
+            String placesJson = gson.toJson(availablePlaces);
+
+            // 組裝我們精心設計的 Prompt
+            String prompt = String.format(
+                    "你是「Foodmap」App 的美食顧問。請根據以下 JSON 格式的店家資料，為使用者回答問題。" +
+                            "你的回答必須簡潔、友善，並且只能從我提供的資料中選擇，不許自己編造。\n\n" +
+                            "[店家資料]\n%s\n\n" +
+                            "[使用者問題]\n%s\n\n" +
+                            "請從店家資料中，推薦最符合的1-2個店家，並簡單說明原因。",
+                    placesJson,
+                    userQuestion
+            );
+
+            // 直接呼叫你的 OpenAIClient
+            String reply = OpenAIClient.ask(prompt);
+
+            // 將結果切換回主執行緒來更新 LiveData
+            _aiResponse.postValue(reply);
+            _isAiLoading.postValue(false); // 結束載入
+        });
+    }
+
+
+    // ---------------- Home (以下程式碼保持不變) ----------------
 
     /** 依目前 selectedTags + tagMatchMode 以索引查詢 Firestore。 */
     public void loadPlaces() {
@@ -99,13 +148,11 @@ public class HomeViewModel extends AndroidViewModel {
         Query q = db.collection(COLLECTION);
 
         if (!tags.isEmpty()) {
-            // Firestore 限制：array-contains-any 最多 10 個值
             List<String> queryTags = tags.size() > 10 ? tags.subList(0, 10) : tags;
             q = q.whereArrayContainsAny(FIELD_TAGS, queryTags);
         }
 
-        q = q.orderBy(FIELD_RATING, Query.Direction.DESCENDING)
-                .limit(MAX_ITEMS);
+        q = q.orderBy(FIELD_RATING, Query.Direction.DESCENDING).limit(MAX_ITEMS);
 
         final List<String> selectedCopy = new ArrayList<>(tags);
         final TagMatchMode modeCopy = mode;
@@ -137,7 +184,6 @@ public class HomeViewModel extends AndroidViewModel {
         }
     }
 
-    // Firestore 回傳處理（支援 ALL 模式的 client-side 過濾）
     private void onPlacesLoaded(QuerySnapshot snap, List<String> selectedTags, TagMatchMode mode) {
         Set<String> dislikedIds = getDislikedIds();
         Set<String> favoriteIds = favStore.getAll().stream()
@@ -150,13 +196,9 @@ public class HomeViewModel extends AndroidViewModel {
         if (snap != null) {
             for (DocumentSnapshot d : snap.getDocuments()) {
                 try {
-                    // 先取 tags_top3 做 ALL 過濾，再轉 Place
                     List<String> docTags = (List<String>) d.get(FIELD_TAGS);
-
-                    if (requireAll) {
-                        if (docTags == null || !docTags.containsAll(selectedTags)) {
-                            continue; // 不符合 ALL
-                        }
+                    if (requireAll && (docTags == null || !docTags.containsAll(selectedTags))) {
+                        continue;
                     }
                     Place p = d.toObject(Place.class);
                     if (p != null) {
@@ -202,13 +244,12 @@ public class HomeViewModel extends AndroidViewModel {
 
     // ---------------- Trash：用本機 prefs 的 ID 批次撈回 Place ----------------
 
-    /** 以 SharedPreferences 的 ID 清單載入垃圾桶列表（每批 10 筆 whereIn(docId)）。 */
     public void loadDislikedPlacesFromPrefs() {
         isLoadingTrash.setValue(true);
         trashError.setValue(null);
 
         Set<String> ids = getDislikedIds();
-        if (ids == null || ids.isEmpty()) {
+        if (ids.isEmpty()) {
             dislikedPlaces.setValue(new ArrayList<>());
             isLoadingTrash.setValue(false);
             return;
@@ -217,16 +258,16 @@ public class HomeViewModel extends AndroidViewModel {
         List<String> idList = new ArrayList<>(ids);
         final int totalBatches = (idList.size() + 9) / 10;
         AtomicInteger done = new AtomicInteger(0);
-        List<Place> collected = new ArrayList<>();
+        final List<Place> collected = Collections.synchronizedList(new ArrayList<>());
 
         for (int i = 0; i < idList.size(); i += 10) {
             List<String> batch = idList.subList(i, Math.min(i + 10, idList.size()));
             db.collection(COLLECTION)
                     .whereIn(FieldPath.documentId(), batch)
                     .get()
-                    .addOnSuccessListener(snap -> {
-                        if (snap != null) {
-                            for (DocumentSnapshot d : snap.getDocuments()) {
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            for (DocumentSnapshot d : task.getResult()) {
                                 try {
                                     Place p = d.toObject(Place.class);
                                     if (p != null) {
@@ -235,18 +276,16 @@ public class HomeViewModel extends AndroidViewModel {
                                     }
                                 } catch (Exception ignore) {}
                             }
+                        } else {
+                            Log.e(TAG, "loadDislikedPlacesFromPrefs batch failed", task.getException());
                         }
+
                         if (done.incrementAndGet() == totalBatches) {
-                            dislikedPlaces.setValue(collected);
-                            isLoadingTrash.setValue(false);
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "loadDislikedPlacesFromPrefs batch failed", e);
-                        if (done.incrementAndGet() == totalBatches) {
-                            trashError.setValue("讀取垃圾桶失敗：" + e.getMessage());
-                            dislikedPlaces.setValue(collected);
-                            isLoadingTrash.setValue(false);
+                            dislikedPlaces.postValue(collected);
+                            isLoadingTrash.postValue(false);
+                            if (!task.isSuccessful()){
+                                trashError.postValue("讀取垃圾桶失敗：" + task.getException().getMessage());
+                            }
                         }
                     });
         }
@@ -265,5 +304,12 @@ public class HomeViewModel extends AndroidViewModel {
         }
 
         loadDislikedPlacesFromPrefs();
+    }
+
+    // ✨ 5. 當 ViewModel 被銷毀時，關閉執行緒池，避免記憶體洩漏
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        executor.shutdown();
     }
 }
