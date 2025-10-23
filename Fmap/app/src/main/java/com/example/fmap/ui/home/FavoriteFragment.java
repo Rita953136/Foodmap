@@ -70,7 +70,8 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
     public void onItemClick(Place place) {
         if (getActivity() instanceof AppCompatActivity && place != null && place.getId() != null) {
             AppCompatActivity activity = (AppCompatActivity) getActivity();
-            PlaceDetailFragment detailFragment = PlaceDetailFragment.newInstance(place.getId());
+            // ✅ 帶入兩個參數：placeId + Place（作為查不到資料時的備援）
+            PlaceDetailFragment detailFragment = PlaceDetailFragment.newInstance(place.getId(), place);
             detailFragment.show(activity.getSupportFragmentManager(), detailFragment.getTag());
         }
     }
@@ -78,14 +79,14 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
     @Override
     public void onHeartClick(Place place, int position) {
         if (favoritesStore != null && place != null && place.getId() != null) {
-            favoritesStore.removeById(place.getId());   // ← 換成 removeById
+            favoritesStore.removeById(place.getId());
             adapter.removeItem(position);
 
             if (adapter.getItemCount() == 0 && emptyView != null) {
                 emptyView.setVisibility(View.VISIBLE);
             }
 
-            Toast.makeText(getContext(), "已取消收藏：" + place.getName(), Toast.LENGTH_SHORT).show(); // ← 用 getter
+            Toast.makeText(getContext(), "已取消收藏：" + place.getName(), Toast.LENGTH_SHORT).show();
         }
     }
 }

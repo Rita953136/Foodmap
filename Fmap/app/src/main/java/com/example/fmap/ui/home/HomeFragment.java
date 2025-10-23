@@ -152,10 +152,13 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
 
     @Override
     public void onPlaceClick(Place place) {
-        if (place != null && place.getId() != null) {
-            showPlaceDetails(place.getId());
-        }
+        PlaceDetailFragment f = PlaceDetailFragment.newInstance(
+                place.getId(),   // placeId
+                place            // 備援的 Place 物件
+        );
+        f.show(getParentFragmentManager(), "place_detail");
     }
+
 
     private void showPlaceDetails(String placeId) {
         if (getActivity() instanceof AppCompatActivity) {

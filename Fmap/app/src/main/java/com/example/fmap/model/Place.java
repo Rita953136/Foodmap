@@ -30,6 +30,7 @@ public class Place implements Serializable {
     private String coverImage;     // 主要圖片 URL
     private List<String> menuItems; // 菜單項目
 
+
     // ---- 建構子 ----
     public Place() {}
 
@@ -82,9 +83,16 @@ public class Place implements Serializable {
         }
         return coverImage;
     }
+    // ---- 營業時間 ----
+    private java.util.Map<String, java.util.List<com.example.fmap.model.TimeRange>> businessHours;
 
+    public java.util.Map<String, java.util.List<com.example.fmap.model.TimeRange>> getBusinessHours() {
+        return businessHours;
+    }
 
-
+    public void setBusinessHours(java.util.Map<String, java.util.List<com.example.fmap.model.TimeRange>> businessHours) {
+        this.businessHours = businessHours;
+    }
     public List<String> getMenuItems() { return menuItems; }
     public void setMenuItems(List<String> menuItems) { this.menuItems = menuItems; }
 

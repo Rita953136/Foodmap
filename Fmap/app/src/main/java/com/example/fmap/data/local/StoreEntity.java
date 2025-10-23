@@ -17,30 +17,17 @@ public class StoreEntity {
     public String menuItems;    // 逗號分隔
     public Double lat;
     public Double lng;
-
-    // ✅ 新增：封面圖片路徑（例如 "stores/鬼匠拉麵-逢甲店/cover.jpg"）
+    public String phone;               // 電話
+    public String coverImage;          // 封面圖相對路徑或 URL（e.g. stores/.../cover.jpg 或 https://...）
+    public String businessHoursJson;   // 營業時間 Map 的 JSON 字串
     public String imagePath;
-
-    // ✅ 更新建構子：加入 imagePath 參數
     public StoreEntity(@NonNull String id, String name, String address, Double rating,
                        String priceRange, String tags, String menuItems,
-                       Double lat, Double lng, String imagePath) {
-        this.id = id;
-        this.name = name;
-        this.address = address;
-        this.rating = rating;
-        this.priceRange = priceRange;
-        this.tags = tags;
-        this.menuItems = menuItems;
-        this.lat = lat;
-        this.lng = lng;
-        this.imagePath = imagePath;
-    }
-
-    // ✅ 若之後需要簡化建立（沒有圖片的舊版本）
-    public StoreEntity(@NonNull String id, String name, String address, Double rating,
-                       String priceRange, String tags, String menuItems,
-                       Double lat, Double lng) {
-        this(id, name, address, rating, priceRange, tags, menuItems, lat, lng, null);
+                       Double lat, Double lng,
+                       String phone, String coverImage, String businessHoursJson) {
+        this.id = id; this.name = name; this.address = address; this.rating = rating;
+        this.priceRange = priceRange; this.tags = tags; this.menuItems = menuItems;
+        this.lat = lat; this.lng = lng;
+        this.phone = phone; this.coverImage = coverImage; this.businessHoursJson = businessHoursJson;
     }
 }

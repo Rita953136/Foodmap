@@ -151,6 +151,7 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
                     if (clicked != null) listener.onPlaceClick(clicked);
                 }
             });
+
         }
 
     }
