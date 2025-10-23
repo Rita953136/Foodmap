@@ -20,63 +20,40 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 用於顯示收藏店家列表的 RecyclerView Adapter
- */
+/** 用於顯示收藏店家列表的 RecyclerView Adapter */
 public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.FavoriteViewHolder> {
 
     private final List<Place> favoriteList = new ArrayList<>();
     private final OnFavoriteClickListener listener;
     private final Context context;
 
-    /**
-     * 定義點擊事件的介面 (Interface)
-     */
     public interface OnFavoriteClickListener {
         void onItemClick(Place place);
         void onHeartClick(Place place, int position);
     }
 
-    /**
-     * Adapter 的建構子
-     * @param context  Context，用於 Glide
-     * @param listener 點擊事件的監聽器
-     */
     public FavoriteAdapter(Context context, @NonNull OnFavoriteClickListener listener) {
         this.context = context.getApplicationContext();
         this.listener = listener;
     }
 
-    /**
-     * 更新 Adapter 的資料列表
-     * @param newPlaces 新的店家列表
-     */
     public void submitList(List<Place> newPlaces) {
         favoriteList.clear();
-        if (newPlaces != null) {
-            favoriteList.addAll(newPlaces);
-        }
-        // 通知 RecyclerView 資料已變更
+        if (newPlaces != null) favoriteList.addAll(newPlaces);
         notifyDataSetChanged();
     }
 
-    /**
-     * 從列表中移除一個項目
-     * @param position 要移除的項目位置
-     */
     public void removeItem(int position) {
         if (position >= 0 && position < favoriteList.size()) {
             favoriteList.remove(position);
             notifyItemRemoved(position);
-            notifyItemRangeChanged(position, favoriteList.size()); // 更新後續項目的位置
+            notifyItemRangeChanged(position, favoriteList.size());
         }
     }
-
 
     @NonNull
     @Override
     public FavoriteViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // 載入 item_favorite.xml 作為列表項目的佈局
         View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_favorite, parent, false);
         return new FavoriteViewHolder(view);
@@ -84,23 +61,14 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
 
     @Override
     public void onBindViewHolder(@NonNull FavoriteViewHolder holder, int position) {
-        // 取得目前位置的店家資料
-        Place currentPlace = favoriteList.get(position);
-        // 綁定資料到 View 上
-        holder.bind(currentPlace, context, listener);
+        holder.bind(favoriteList.get(position), context, listener);
     }
 
     @Override
-    public int getItemCount() {
-        return favoriteList.size();
-    }
+    public int getItemCount() { return favoriteList.size(); }
 
-
-    /**
-     * ViewHolder 類別，負責管理 item_favorite.xml 中的所有 View
-     */
+    /** ViewHolder：綁定 item_favorite.xml 的元件 */
     static class FavoriteViewHolder extends RecyclerView.ViewHolder {
-        // 對應 item_favorite.xml 中的所有 View
         private final ImageView imgThumb;
         private final TextView tvName;
         private final TextView tvMeta;
@@ -109,7 +77,6 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
 
         public FavoriteViewHolder(@NonNull View itemView) {
             super(itemView);
-            // 初始化 View
             imgThumb = itemView.findViewById(R.id.imgThumb);
             tvName = itemView.findViewById(R.id.tvName);
             tvMeta = itemView.findViewById(R.id.tvMeta);
@@ -117,57 +84,47 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
             btnHeart = itemView.findViewById(R.id.btnHeart);
         }
 
-        /**
-         * 將 Place 物件的資料綁定到 UI 上
-         */
         public void bind(final Place place, Context context, final OnFavoriteClickListener listener) {
-            // 設定店家名稱
-            tvName.setText(place.name);
+            // 名稱
+            tvName.setText(place.getName());
 
-            // 設定評分和地址等元資訊
-            String metaText = "";
-            if (place.rating != null && place.rating > 0) {
-                metaText = String.format(Locale.getDefault(), "%.1f ★", place.rating);
+            // 評分 + 地址
+            StringBuilder meta = new StringBuilder();
+            if (place.getRating() != null && place.getRating() > 0) {
+                meta.append(String.format(Locale.getDefault(), "%.1f ★", place.getRating()));
             }
-            if (place.address != null && !place.address.isEmpty()) {
-                // 如果已有評分，加上分隔符號
-                if (!metaText.isEmpty()) {
-                    metaText += " ・ ";
-                }
-                metaText += place.address;
+            if (place.getAddress() != null && !place.getAddress().isEmpty()) {
+                if (meta.length() > 0) meta.append(" ・ ");
+                meta.append(place.getAddress());
             }
+            String metaText = meta.toString();
             tvMeta.setText(metaText);
             tvMeta.setVisibility(metaText.isEmpty() ? View.GONE : View.VISIBLE);
 
-
-            // 設定標籤
-            if (place.tags != null && !place.tags.isEmpty()) {
-                tvTags.setText("#" + TextUtils.join(" #", place.tags));
+            // 標籤（使用 Place.getTagsTop3()）
+            List<String> tags = place.getTagsTop3();
+            if (tags != null && !tags.isEmpty()) {
+                tvTags.setText("#" + TextUtils.join(" #", tags));
                 tvTags.setVisibility(View.VISIBLE);
             } else {
                 tvTags.setVisibility(View.GONE);
             }
 
-            // 使用 Glide 載入圖片
+            // 圖片（Place 使用 coverImage）
+            String cover = place.getCoverImage();
             Glide.with(context)
-                    .load(place.photoUrl)
+                    .load(cover)
                     .centerCrop()
-                    .placeholder(R.color.material_dynamic_neutral80) // 預設的灰色背景
-                    .error(R.color.material_dynamic_neutral80) // 載入失敗時的背景
+                    .placeholder(R.color.material_dynamic_neutral80)
+                    .error(R.color.material_dynamic_neutral80)
                     .into(imgThumb);
 
-            // 設定整個項目的點擊監聽器
+            // 點擊事件
             itemView.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onItemClick(place);
-                }
+                if (listener != null) listener.onItemClick(place);
             });
-
-            // 設定愛心按鈕的點擊監聽器
             btnHeart.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onHeartClick(place, getBindingAdapterPosition());
-                }
+                if (listener != null) listener.onHeartClick(place, getBindingAdapterPosition());
             });
         }
     }

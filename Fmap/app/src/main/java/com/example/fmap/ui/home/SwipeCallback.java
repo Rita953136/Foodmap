@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.model.Swipe; // ✨ 1. 匯入你的 Swipe CLASS
 
+
 /**
  * RecyclerView 的滑動回呼處理
  * 這個版本會回傳 Swipe.Action enum，而不是舊的 Swipe enum

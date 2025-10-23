@@ -4,23 +4,31 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.fmap.R;
 import com.example.fmap.model.Place;
 
-public class TrashFragment extends Fragment {
+import java.util.List;
 
-    private HomeViewModel homeVM;
+/** 垃圾桶頁（不喜歡清單），純本機版（容錯 ProgressBar id） */
+public class TrashFragment extends Fragment implements TrashCardAdapter.OnTrashActionListener {
+
     private RecyclerView rvTrash;
-    private TrashCardAdapter TrashCardAdapter;
-    private TextView tvEmptyTrash;
+    private ProgressBar progress; // 可能為 null
+    private TextView tvEmpty;
+
+    private TrashCardAdapter adapter;
+    private HomeViewModel viewModel;
 
     @Nullable
     @Override
@@ -29,53 +37,84 @@ public class TrashFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+    public void onViewCreated(@NonNull View v, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(v, savedInstanceState);
+        rvTrash  = v.findViewById(R.id.rvTrash);
+        tvEmpty  = v.findViewById(R.id.tvEmptyTrash);
+        progress = findProgressBar(v); // ← 容錯尋找
 
-        // 初始化 ViewModel 和 View
-        homeVM = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
-        rvTrash = view.findViewById(R.id.rvTrash);
-        tvEmptyTrash = view.findViewById(R.id.tvEmptyTrash);
+        adapter = new TrashCardAdapter(requireContext(), this);
+        rvTrash.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvTrash.setAdapter(adapter);
 
-        setupRecyclerView();
+        viewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
+
         observeViewModel();
-        homeVM.loadDislikedPlacesFromPrefs();
+        viewModel.loadDislikedPlacesFromPrefs(); // 載入一次
     }
 
-    private void setupRecyclerView() {
-        TrashCardAdapter = new TrashCardAdapter(new TrashCardAdapter.Listener() {
-            @Override
-            public void onRestore(@NonNull Place p) {
-                homeVM.removeFromDislikes(p.id);
-                Toast.makeText(getContext(), "已還原 " + (p.name != null ? p.name : ""), Toast.LENGTH_SHORT).show();
-            }
-            @Override
-            public void onDelete(@NonNull Place p) {
-                Toast.makeText(getContext(), "已刪除 " + (p.name != null ? p.name : ""), Toast.LENGTH_SHORT).show();
-            }
-        });
+    /** 依序嘗試常見 id，找不到回傳 null */
+    /** 依序嘗試常見 id（不直接引用 R.id，避免編譯期紅字） */
+    private @Nullable ProgressBar findProgressBar(@NonNull View root) {
+        // 1) 先試專案常用的 loading_indicator（若 layout 有的話）
+        ProgressBar pb = root.findViewById(R.id.loading_indicator);
+        if (pb != null) return pb;
 
-        rvTrash.setLayoutManager(new LinearLayoutManager(getContext()));
-        rvTrash.setAdapter(TrashCardAdapter);
+        // 2) 以名稱動態尋找 progressTrash
+        int id = getResources().getIdentifier("progressTrash", "id", requireContext().getPackageName());
+        if (id != 0) {
+            pb = root.findViewById(id);
+            if (pb != null) return pb;
+        }
+
+        // 3) 以名稱動態尋找 progressBar
+        id = getResources().getIdentifier("progressBar", "id", requireContext().getPackageName());
+        if (id != 0) {
+            pb = root.findViewById(id);
+            if (pb != null) return pb;
+        }
+
+        // 找不到就不顯示進度條
+        return null;
     }
 
 
     private void observeViewModel() {
-        homeVM.getDislikedPlaces().observe(getViewLifecycleOwner(), places -> {
-            if (places != null && !places.isEmpty()) {
-                TrashCardAdapter.submitList(places);
-                rvTrash.setVisibility(View.VISIBLE);
-                tvEmptyTrash.setVisibility(View.GONE);
-            } else {
+        viewModel.getIsLoadingTrash().observe(getViewLifecycleOwner(), loading -> {
+            boolean show = loading != null && loading;
+            if (progress != null) progress.setVisibility(show ? View.VISIBLE : View.GONE);
+            if (show) {
                 rvTrash.setVisibility(View.GONE);
-                tvEmptyTrash.setVisibility(View.VISIBLE);
+                tvEmpty.setVisibility(View.GONE);
             }
         });
 
-        homeVM.getTrashError().observe(getViewLifecycleOwner(), error -> {
-            if (error != null && !error.isEmpty()) {
-                Toast.makeText(getContext(), error, Toast.LENGTH_LONG).show();
+        viewModel.getTrashError().observe(getViewLifecycleOwner(), err -> {
+            if (err != null && !err.isEmpty()) {
+                Toast.makeText(getContext(), err, Toast.LENGTH_LONG).show();
             }
         });
+
+        viewModel.getDislikedPlaces().observe(getViewLifecycleOwner(), this::renderList);
+    }
+
+    private void renderList(List<Place> list) {
+        adapter.submit(list);
+        boolean has = list != null && !list.isEmpty();
+        rvTrash.setVisibility(has ? View.VISIBLE : View.GONE);
+        tvEmpty.setVisibility(has ? View.GONE : View.VISIBLE);
+    }
+
+    @Override
+    public void onRestore(@NonNull Place place, int position) {
+        if (place.getId() == null) return;
+        viewModel.removeFromDislikes(place.getId());
+        adapter.removeAt(position);
+        if (adapter.getItemCount() == 0) {
+            tvEmpty.setVisibility(View.VISIBLE);
+        }
+        Toast.makeText(getContext(),
+                "已復原：「" + (place.getName() != null ? place.getName() : "") + "」",
+                Toast.LENGTH_SHORT).show();
     }
 }

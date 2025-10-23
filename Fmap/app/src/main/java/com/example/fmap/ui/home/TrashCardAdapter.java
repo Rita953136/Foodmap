@@ -1,107 +1,127 @@
 package com.example.fmap.ui.home;
 
+import android.content.Context;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.DiffUtil;
-import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
 import com.example.fmap.R;
 import com.example.fmap.model.Place;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.Locale;
 
-public class TrashCardAdapter extends ListAdapter<Place, TrashCardAdapter.TrashCardVH> {
+public class TrashCardAdapter extends RecyclerView.Adapter<TrashCardAdapter.VH> {
 
-    public interface Listener {
-        void onRestore(@NonNull Place p);
-        void onDelete(@NonNull Place p);
+    public interface OnTrashActionListener {
+        void onRestore(@NonNull Place place, int position);
     }
 
-    private final Listener listener;
+    private final List<Place> data = new ArrayList<>();
+    private final Context context;
+    private final OnTrashActionListener listener;
 
-    public TrashCardAdapter(@NonNull Listener listener) {
-        super(DIFF_CALLBACK);
-        this.listener = listener;
+    public TrashCardAdapter(@NonNull Context ctx, @NonNull OnTrashActionListener l) {
+        this.context = ctx.getApplicationContext();
+        this.listener = l;
+    }
+
+    public void submit(List<Place> list) {
+        data.clear();
+        if (list != null) data.addAll(list);
+        notifyDataSetChanged();
+    }
+
+    public void removeAt(int pos) {
+        if (pos >= 0 && pos < data.size()) {
+            data.remove(pos);
+            notifyItemRemoved(pos);
+        }
+    }
+
+    public Place getItem(int pos) {
+        return (pos >= 0 && pos < data.size()) ? data.get(pos) : null;
     }
 
     @NonNull
     @Override
-    public TrashCardVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_trash_card, parent, false);
-        return new TrashCardVH(v);
+        return new VH(v, listener);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull TrashCardVH holder, int position) {
+    public void onBindViewHolder(@NonNull VH holder, int position) {
         Place p = getItem(position);
-        holder.bind(p, listener);
+        if (p != null) holder.bind(p, context);
     }
 
-    public static class TrashCardVH extends RecyclerView.ViewHolder {
-        ImageView img;
-        TextView tvName, tvRating, tvTags, btnRestore, btnDelete;
+    @Override
+    public int getItemCount() { return data.size(); }
 
-        public TrashCardVH(@NonNull View v) {
+    static class VH extends RecyclerView.ViewHolder {
+        ImageView imgThumb, ivStar;
+        TextView tvName, tvRating, tvTags;
+        ImageButton btnRestore;
+
+        private final OnTrashActionListener listener;
+
+        VH(@NonNull View v, OnTrashActionListener l) {
             super(v);
-            img        = v.findViewById(R.id.imgThumb);
-            tvName     = v.findViewById(R.id.tvName);
-            tvRating   = v.findViewById(R.id.tvRating);
-            tvTags     = v.findViewById(R.id.tvTags);
+            listener = l;
+            imgThumb = v.findViewById(R.id.imgThumb);
+            ivStar   = v.findViewById(R.id.ivStar);
+            tvName   = v.findViewById(R.id.tvName);
+            tvRating = v.findViewById(R.id.tvRating);
+            tvTags   = v.findViewById(R.id.tvTags);
             btnRestore = v.findViewById(R.id.btnRestore);
-            btnDelete  = v.findViewById(R.id.btnDelete);
         }
 
-        public void bind(@NonNull final Place p, @NonNull final Listener listener) {
-            tvName.setText(p.name != null ? p.name : "(無名稱)");
-            tvRating.setText(p.rating != null ? String.valueOf(p.rating) : "-");
-            if (p.tags != null && !p.tags.isEmpty()) {
-                tvTags.setText(android.text.TextUtils.join("、", p.tags));
+        void bind(@NonNull Place p, @NonNull Context ctx) {
+            tvName.setText(p.getName() != null ? p.getName() : "");
+
+            Double r = p.getRating();
+            if (r != null && r > 0) {
+                tvRating.setText(String.format(Locale.getDefault(), "%.1f", r));
+                tvRating.setVisibility(View.VISIBLE);
+                if (ivStar != null) ivStar.setVisibility(View.VISIBLE);
             } else {
-                tvTags.setText("");
+                tvRating.setText("");
+                tvRating.setVisibility(View.GONE);
+                if (ivStar != null) ivStar.setVisibility(View.GONE);
             }
 
-            if (p.photoUrl != null && !p.photoUrl.isEmpty()) {
-                // Glide/Picasso
-                // Glide.with(img.getContext()).load(p.photoUrl).into(img);
+            List<String> tags = p.getTagsTop3();
+            if (tags != null && !tags.isEmpty()) {
+                tvTags.setVisibility(View.VISIBLE);
+                tvTags.setText("#" + TextUtils.join(" #", tags.size() > 3 ? tags.subList(0, 3) : tags));
             } else {
-                img.setImageResource(android.R.color.darker_gray);
+                tvTags.setVisibility(View.GONE);
             }
 
-            btnRestore.setOnClickListener(v -> listener.onRestore(p));
-            btnDelete.setOnClickListener(v -> listener.onDelete(p));
+            Glide.with(ctx)
+                    .load(p.getCoverImage())
+                    .centerCrop()
+                    .placeholder(R.color.material_dynamic_neutral80)
+                    .error(R.color.material_dynamic_neutral80)
+                    .into(imgThumb);
+
+            btnRestore.setOnClickListener(v -> {
+                if (listener != null) {
+                    int pos = getBindingAdapterPosition();
+                    if (pos != RecyclerView.NO_POSITION) listener.onRestore(p, pos);
+                }
+            });
         }
     }
-
-    private static final DiffUtil.ItemCallback<Place> DIFF_CALLBACK =
-            new DiffUtil.ItemCallback<Place>() {
-                @Override
-                public boolean areItemsTheSame(@NonNull Place oldItem, @NonNull Place newItem) {
-                    // 用 id 判斷是否同一項
-                    return Objects.equals(oldItem.id, newItem.id);
-                }
-
-                @Override
-                public boolean areContentsTheSame(@NonNull Place oldItem, @NonNull Place newItem) {
-                    if (!Objects.equals(oldItem.name, newItem.name)) return false;
-                    if (!Objects.equals(oldItem.rating, newItem.rating)) return false;
-                    if (!Objects.equals(oldItem.photoUrl, newItem.photoUrl)) return false;
-
-                    List<String> ot = oldItem.tags, nt = newItem.tags;
-                    if (ot == null && nt == null) return true;
-                    if (ot == null || nt == null) return false;
-                    if (ot.size() != nt.size()) return false;
-                    for (int i = 0; i < ot.size(); i++) {
-                        if (!Objects.equals(ot.get(i), nt.get(i))) return false;
-                    }
-                    return true;
-                }
-            };
 }

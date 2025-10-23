@@ -15,14 +15,10 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.R;
-import com.example.fmap.data.FavoritesStore;
 import com.example.fmap.model.Place;
 
 import java.util.List;
 
-/**
- * 負責顯示「我的收藏」頁面的 Fragment
- */
 public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavoriteClickListener {
 
     private RecyclerView recyclerView;
@@ -33,15 +29,12 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        // 載入 fragment_favorite.xml 佈局
         return inflater.inflate(R.layout.fragment_favorite, container, false);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
-        // ✅ 改成透過 getInstance() 取得單例
         favoritesStore = FavoritesStore.getInstance(requireContext());
 
         recyclerView = view.findViewById(R.id.rvFavorites);
@@ -53,22 +46,15 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
     @Override
     public void onResume() {
         super.onResume();
-        // 每次回到這個頁面時，都重新載入一次收藏列表
         loadFavorites();
     }
 
-    /**
-     * 設定 RecyclerView 和 Adapter
-     */
     private void setupRecyclerView() {
         adapter = new FavoriteAdapter(requireContext(), this);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         recyclerView.setAdapter(adapter);
     }
 
-    /**
-     * 從 FavoritesStore 載入資料並更新 UI
-     */
     private void loadFavorites() {
         if (favoritesStore == null || adapter == null) return;
 
@@ -80,28 +66,26 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
         }
     }
 
-    // --- 實作 FavoriteAdapter.OnFavoriteClickListener ---
-
     @Override
     public void onItemClick(Place place) {
-        if (getActivity() instanceof AppCompatActivity && place != null && place.id != null) {
+        if (getActivity() instanceof AppCompatActivity && place != null && place.getId() != null) {
             AppCompatActivity activity = (AppCompatActivity) getActivity();
-            PlaceDetailFragment detailFragment = PlaceDetailFragment.newInstance(place.id);
+            PlaceDetailFragment detailFragment = PlaceDetailFragment.newInstance(place.getId());
             detailFragment.show(activity.getSupportFragmentManager(), detailFragment.getTag());
         }
     }
 
     @Override
     public void onHeartClick(Place place, int position) {
-        if (favoritesStore != null && place != null && place.id != null) {
-            favoritesStore.remove(place.id);
+        if (favoritesStore != null && place != null && place.getId() != null) {
+            favoritesStore.removeById(place.getId());   // ← 換成 removeById
             adapter.removeItem(position);
 
             if (adapter.getItemCount() == 0 && emptyView != null) {
                 emptyView.setVisibility(View.VISIBLE);
             }
 
-            Toast.makeText(getContext(), "已取消收藏：" + place.name, Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "已取消收藏：" + place.getName(), Toast.LENGTH_SHORT).show(); // ← 用 getter
         }
     }
 }

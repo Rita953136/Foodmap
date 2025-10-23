@@ -9,7 +9,6 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.RatingBar;
 import android.widget.TextView;
@@ -21,36 +20,36 @@ import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
 import com.example.fmap.R;
-import com.example.fmap.data.FavoritesStore;
+import com.example.fmap.data.local.StoreMappers;
 import com.example.fmap.model.Place;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-import com.google.android.material.button.MaterialButton; // ✨ 1. 將 Button 改為 MaterialButton
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
+/** 店家詳情（純本機資料版） */
 public class PlaceDetailFragment extends BottomSheetDialogFragment {
 
     private static final String ARG_PLACE_ID = "place_id";
 
-    private FirebaseFirestore db;
     private FavoritesStore favoritesStore;
+    private StoreRepository storeRepo;   // ← 用本機 repository
     private String placeId;
     private Place currentPlace;
     private boolean isCurrentlyFavorite = false;
 
-    // View 變數
+    // Views
     private ImageView imgThumb;
     private TextView tvName, tvRating, tvMeta;
     private RatingBar ratingBar;
     private ChipGroup chipGroupTags;
-    private MaterialButton btnNavigate, btnHeart; // ✨ 1. 將 Button 改為 MaterialButton
+    private MaterialButton btnNavigate, btnHeart;
 
     public static PlaceDetailFragment newInstance(String placeId) {
         PlaceDetailFragment fragment = new PlaceDetailFragment();
@@ -63,11 +62,11 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        db = FirebaseFirestore.getInstance();
         if (getContext() != null) {
-            // ✨ 2. 核心修改：使用 getInstance() 來獲取單例物件
             favoritesStore = FavoritesStore.getInstance(getContext());
         }
+        // 以 Application 建立本機資料 Repository
+        storeRepo = new StoreRepository(requireActivity().getApplication());
 
         if (getArguments() != null) {
             placeId = getArguments().getString(ARG_PLACE_ID);
@@ -88,7 +87,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         setupClickListeners();
 
         if (placeId != null) {
-            loadPlaceDetails();
+            loadPlaceDetailsLocal();
         } else {
             Toast.makeText(getContext(), "錯誤：店家 ID 為空", Toast.LENGTH_SHORT).show();
             dismiss();
@@ -111,77 +110,56 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         btnHeart.setOnClickListener(v -> toggleFavoriteStatus());
     }
 
-    private void toggleFavoriteStatus() {
-        if (currentPlace == null || favoritesStore == null) return;
-
-        isCurrentlyFavorite = !isCurrentlyFavorite;
-
-        if (isCurrentlyFavorite) {
-            favoritesStore.add(currentPlace);
-            Toast.makeText(getContext(), "已收藏", Toast.LENGTH_SHORT).show();
-        } else {
-            favoritesStore.remove(currentPlace.id);
-            Toast.makeText(getContext(), "已取消收藏", Toast.LENGTH_SHORT).show();
-        }
-        updateHeartButtonUI();
-    }
-
-    private void updateHeartButtonUI() {
-        if (getContext() == null || btnHeart == null) return;
-        if (isCurrentlyFavorite) {
-            btnHeart.setText("已收藏");
-            btnHeart.setIcon(ContextCompat.getDrawable(getContext(), R.drawable.baseline_favorite_24));
-        } else {
-            btnHeart.setText("收藏");
-            btnHeart.setIcon(ContextCompat.getDrawable(getContext(), R.drawable.outline_favorite_24));
-        }
-    }
-
-    private void loadPlaceDetails() {
-        db.collection("stores_summary").document(placeId)
-                .get()
-                .addOnSuccessListener(this::bindData)
-                .addOnFailureListener(e -> {
-                    if (getContext() != null) {
-                        Toast.makeText(getContext(), "讀取資料失敗: " + e.getMessage(), Toast.LENGTH_LONG).show();
+    // ------- 資料載入（本機） -------
+    private void loadPlaceDetailsLocal() {
+        // 直接用 getByIds 查單筆，並轉為 Place
+        storeRepo.getByIds(Collections.singletonList(placeId))
+                .observe(getViewLifecycleOwner(), entities -> {
+                    if (entities == null || entities.isEmpty()) {
+                        Toast.makeText(getContext(), "找不到該店家資料", Toast.LENGTH_LONG).show();
                         dismiss();
+                        return;
                     }
+                    currentPlace = StoreMappers.toPlace(entities.get(0));
+                    if (currentPlace == null) {
+                        Toast.makeText(getContext(), "資料格式錯誤", Toast.LENGTH_LONG).show();
+                        dismiss();
+                        return;
+                    }
+                    // 收藏狀態
+                    if (favoritesStore != null && currentPlace.getId() != null) {
+                        isCurrentlyFavorite = favoritesStore.contains(currentPlace.getId());
+                    }
+                    updateHeartButtonUI();
+                    bindPlaceToViews(currentPlace);
                 });
     }
 
-    private void bindData(@NonNull DocumentSnapshot doc) {
-        if (getContext() == null || !doc.exists()) {
-            if (getContext() != null) {
-                Toast.makeText(getContext(), "找不到該店家資料", Toast.LENGTH_LONG).show();
-                dismiss();
-            }
-            return;
-        }
+    private void bindPlaceToViews(@NonNull Place p) {
+        // 圖片
+        Glide.with(this)
+                .load(p.getCoverImage())
+                .placeholder(R.color.material_dynamic_neutral90)
+                .centerCrop()
+                .into(imgThumb);
 
-        currentPlace = doc.toObject(Place.class);
-        if (currentPlace == null) {
-            if (getContext() != null) {
-                Toast.makeText(getContext(), "資料格式錯誤", Toast.LENGTH_LONG).show();
-                dismiss();
-            }
-            return;
-        }
-        currentPlace.id = doc.getId();
+        // 名稱
+        tvName.setText(p.getName() != null ? p.getName() : "未命名店家");
 
-        if(favoritesStore != null) {
-            isCurrentlyFavorite = favoritesStore.isFavorite(currentPlace.id);
-            updateHeartButtonUI();
-        }
-
-        Glide.with(this).load(currentPlace.photoUrl).placeholder(R.color.material_dynamic_neutral90).centerCrop().into(imgThumb);
-        tvName.setText(currentPlace.name != null ? currentPlace.name : "未命名店家");
-        double ratingValue = currentPlace.rating != null ? currentPlace.rating : 0.0;
+        // 評分
+        double ratingValue = (p.getRating() != null) ? p.getRating() : 0.0;
         ratingBar.setRating((float) ratingValue);
         tvRating.setText(String.format(Locale.TAIWAN, "%.1f", ratingValue));
-        tvMeta.setText((currentPlace.introLine != null && !currentPlace.introLine.isEmpty()) ? currentPlace.introLine : "暫無簡介");
 
+        // Meta: 地址或價位
+        String meta = (p.getAddress() != null && !p.getAddress().isEmpty())
+                ? p.getAddress()
+                : (p.getPriceRange() != null ? p.getPriceRange() : "");
+        tvMeta.setText(meta);
+
+        // 標籤 Chips
         chipGroupTags.removeAllViews();
-        List<String> tags = currentPlace.tags;
+        List<String> tags = p.getTagsTop3();
         if (tags != null && !tags.isEmpty()) {
             chipGroupTags.setVisibility(View.VISIBLE);
             for (String tag : tags) {
@@ -202,13 +180,37 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         }
     }
 
+    private void toggleFavoriteStatus() {
+        if (currentPlace == null || favoritesStore == null || currentPlace.getId() == null) return;
+
+        isCurrentlyFavorite = !isCurrentlyFavorite;
+        if (isCurrentlyFavorite) {
+            favoritesStore.add(currentPlace);
+            Toast.makeText(getContext(), "已收藏", Toast.LENGTH_SHORT).show();
+        } else {
+            favoritesStore.removeById(currentPlace.getId());
+            Toast.makeText(getContext(), "已取消收藏", Toast.LENGTH_SHORT).show();
+        }
+        updateHeartButtonUI();
+    }
+
+    private void updateHeartButtonUI() {
+        if (getContext() == null || btnHeart == null) return;
+        if (isCurrentlyFavorite) {
+            btnHeart.setText("已收藏");
+            btnHeart.setIcon(ContextCompat.getDrawable(getContext(), R.drawable.baseline_favorite_24));
+        } else {
+            btnHeart.setText("收藏");
+            btnHeart.setIcon(ContextCompat.getDrawable(getContext(), R.drawable.outline_favorite_24));
+        }
+    }
+
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
         BottomSheetDialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
         dialog.setOnShowListener(d -> {
-            BottomSheetDialog bottomSheetDialog = (BottomSheetDialog) d;
-            View bottomSheet = bottomSheetDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            View bottomSheet = ((BottomSheetDialog) d).findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
                 BottomSheetBehavior.from(bottomSheet).setState(BottomSheetBehavior.STATE_EXPANDED);
             }
@@ -218,12 +220,11 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
 
     private void openGoogleMaps() {
         if (getContext() == null || currentPlace == null) return;
-        String addr = (currentPlace.address != null && !currentPlace.address.isEmpty())
-                ? currentPlace.address : "台中市西屯區";
+        String addr = (currentPlace.getAddress() != null && !currentPlace.getAddress().isEmpty())
+                ? currentPlace.getAddress() : "台中市西屯區";
         Uri gmmIntentUri = Uri.parse("geo:0,0?q=" + Uri.encode(addr));
         Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
         mapIntent.setPackage("com.google.android.apps.maps");
-
         if (mapIntent.resolveActivity(getContext().getPackageManager()) != null) {
             startActivity(mapIntent);
         } else {

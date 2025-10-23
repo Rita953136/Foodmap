@@ -1,91 +1,41 @@
 package com.example.fmap.model;
 
-import android.os.Parcel;
-import android.os.Parcelable;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.ItemTouchHelper;
 
-public class Swipe implements Parcelable {
-    public enum Action { LIKE, NOPE }
-    private String placeId;
-    private Action action;
-    private long ts;
-    public Swipe() {}
+/**
+ * 卡片滑動動作模型。
+ * - 右滑：LIKE
+ * - 左滑：NOPE
+ *
+ * 可搭配你的 SwipeCallback / ItemTouchHelper 使用：
+ *   Swipe.Action action = Swipe.fromDirection(direction);
+ *   viewModel.handleSwipeAction(action, place);
+ */
+public final class Swipe {
 
-    public Swipe(String placeId, Action action, long ts) {
-        if (placeId == null || placeId.isEmpty()) {
-            throw new IllegalArgumentException("placeId cannot be null or empty");
+    private Swipe() {}
+
+    /** 對外使用的動作種類（HomeViewModel 依此判斷收藏/丟垃圾桶） */
+    public enum Action {
+        LIKE,   // 右滑
+        NOPE    // 左滑
+    }
+
+    /**
+     * 依據 ItemTouchHelper 的方向回傳對應動作：
+     * - RIGHT -> LIKE
+     * - LEFT  -> NOPE
+     * 其他方向預設回傳 NOPE（也可以改成丟 IllegalArgumentException）
+     */
+    @NonNull
+    public static Action fromDirection(int itemTouchHelperDir) {
+        if ((itemTouchHelperDir & ItemTouchHelper.RIGHT) == ItemTouchHelper.RIGHT) {
+            return Action.LIKE;
+        } else if ((itemTouchHelperDir & ItemTouchHelper.LEFT) == ItemTouchHelper.LEFT) {
+            return Action.NOPE;
         }
-        if (action == null) {
-            throw new IllegalArgumentException("action cannot be null");
-        }
-        this.placeId = placeId;
-        this.action = action;
-        this.ts = ts;
+        // 其它方向（UP/DOWN）視需求自行擴充；這裡先當作 NOPE。
+        return Action.NOPE;
     }
-
-    public static Swipe now(String placeId, Action action) {
-        return new Swipe(placeId, action, System.currentTimeMillis());
-    }
-
-    // --- 小幫手 ---
-    public boolean isLike() { return action == Action.LIKE; }
-    public boolean isNope() { return action == Action.NOPE; }
-
-    // --- Getter / Setter（Firestore / Adapter 取用方便） ---
-    public String getPlaceId() { return placeId; }
-    public void setPlaceId(String placeId) { this.placeId = placeId; }
-
-    public Action getAction() { return action; }
-    public void setAction(Action action) { this.action = action; }
-
-    public long getTs() { return ts; }
-    public void setTs(long ts) { this.ts = ts; }
-
-    // --- toString / equals / hashCode ---
-    @Override
-    public String toString() {
-        return "Swipe{placeId='" + placeId + "', action=" + action + ", ts=" + ts + "}";
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Swipe)) return false;
-        Swipe other = (Swipe) o;
-        if (ts != other.ts) return false;
-        if (!placeId.equals(other.placeId)) return false;
-        return action == other.action;
-    }
-
-    @Override
-    public int hashCode() {
-        int result = placeId.hashCode();
-        result = 31 * result + action.hashCode();
-        result = 31 * result + Long.hashCode(ts);
-        return result;
-    }
-
-    // --- Parcelable ---
-    protected Swipe(Parcel in) {
-        placeId = in.readString();
-        String act = in.readString();
-        action = (act == null) ? null : Action.valueOf(act);
-        ts = in.readLong();
-    }
-
-    @Override
-    public void writeToParcel(Parcel dest, int flags) {
-        dest.writeString(placeId);
-        dest.writeString(action == null ? null : action.name());
-        dest.writeLong(ts);
-    }
-
-    @Override
-    public int describeContents() { return 0; }
-
-    public static final Creator<Swipe> CREATOR = new Creator<Swipe>() {
-        @Override
-        public Swipe createFromParcel(Parcel in) { return new Swipe(in); }
-        @Override
-        public Swipe[] newArray(int size) { return new Swipe[size]; }
-    };
 }

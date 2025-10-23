@@ -53,12 +53,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
-    // 如果你的專案是純 Java，這個區塊可以移除
-    // kotlinOptions {
-    //     jvmTarget = "17"
-    // }
-
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -86,6 +82,8 @@ dependencies {
 
     // --- 圖片載入---
     implementation("com.github.bumptech.glide:glide:4.16.0")
+    implementation(libs.play.services.places)
+    implementation(libs.firebase.storage)
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
 
     // --- Firebase ---
@@ -103,4 +101,10 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0") // OpenAIClient 需要
+
+    implementation ("androidx.room:room-runtime:2.6.1")
+    annotationProcessor ("androidx.room:room-compiler:2.6.1")
+    implementation ("com.google.code.gson:gson:2.11.0")
+    implementation ("androidx.lifecycle:lifecycle-viewmodel:2.8.4")
+    coreLibraryDesugaring ("com.android.tools:desugar_jdk_libs:2.1.2")
 }

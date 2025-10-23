@@ -20,10 +20,11 @@ import androidx.fragment.app.FragmentTransaction;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.fmap.R;
+import com.example.fmap.ui.home.chat.ChatFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.example.fmap.ui.home.AiAdvisorFragment;
+import com.google.android.material.floatingactionbutton.FloatingActionButton; // ✨ 匯入 FAB
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -32,7 +33,6 @@ import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
-
     private DrawerLayout drawerLayout;
     private BottomNavigationView bottomNav;
     private HomeViewModel homeVM;
@@ -41,12 +41,13 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView tvTitle;
     private TextView tvDate;
+    private FloatingActionButton fabChat;
+    private View chatContainer;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
@@ -97,6 +98,12 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+
+        // ✨ 2. 新增：找到並設定懸浮聊天功能
+        fabChat = findViewById(R.id.fab_chat);
+        chatContainer = findViewById(R.id.chat_fragment_container);
+        setupChatFragment();
+        setupFab();
     }
 
     public void setHomeToolbar() {
@@ -128,13 +135,6 @@ public class MainActivity extends AppCompatActivity {
                         .commit();
             }
             return true;
-        }
-        else if (id == R.id.action_ai_advisor) {
-            // 建立並顯示 AiAdvisorFragment
-            AiAdvisorFragment aiFragment = AiAdvisorFragment.newInstance();
-            aiFragment.show(getSupportFragmentManager(), "ai_advisor_dialog"); // 使用 show 方法來顯示 BottomSheet
-            return true; // 表示我們已經處理了這個點擊事件
-
         }
         else if (id == android.R.id.home) {
             getOnBackPressedDispatcher().onBackPressed();
@@ -195,7 +195,12 @@ public class MainActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                // ✨ 4. 新增：優先處理聊天視窗的關閉
+                if (chatContainer != null && chatContainer.getVisibility() == View.VISIBLE) {
+                    closeChatFragment();
+                }
+                // --- 以下為你原有的邏輯，保持不變 ---
+                else if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
                     drawerLayout.closeDrawer(GravityCompat.START);
                 } else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
                     getSupportFragmentManager().popBackStack();
@@ -215,18 +220,61 @@ public class MainActivity extends AppCompatActivity {
     public void setDrawerEnabled(boolean enabled) {
         if (drawerLayout == null || toggle == null) return;
 
-        // 如果啟用，解鎖抽屜；如果禁用，鎖定抽屜
         int lockMode = enabled ? DrawerLayout.LOCK_MODE_UNLOCKED : DrawerLayout.LOCK_MODE_LOCKED_CLOSED;
         drawerLayout.setDrawerLockMode(lockMode);
 
-        // 啟用或禁用漢堡圖示
         toggle.setDrawerIndicatorEnabled(enabled);
 
-        // 如果禁用漢堡圖示，則顯示返回箭頭
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(!enabled);
         }
 
         toggle.syncState();
+    }
+
+
+    // --- ✨ 5. 新增：以下為控制懸浮聊天功能的全新方法 ✨ ---
+
+    /**
+     * 初始化 ChatFragment，並在預設情況下隱藏它。
+     */
+    private void setupChatFragment() {
+        // 檢查 Fragment 是否已存在 (例如螢幕旋轉後)，如果不存在才新增
+        if (getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container) == null) {
+            getSupportFragmentManager().beginTransaction()
+                    .add(R.id.chat_fragment_container, new ChatFragment())
+                    .commitNow(); // 使用 commitNow() 確保 Fragment 立即被建立
+        }
+        // 無論如何，初始狀態下都隱藏聊天容器
+        if (chatContainer != null) {
+            chatContainer.setVisibility(View.GONE);
+        }
+    }
+
+    /**
+     * 設定懸浮按鈕的點擊事件。
+     */
+    private void setupFab() {
+        if (fabChat == null) return;
+        fabChat.setOnClickListener(view -> {
+            // 點擊後，顯示聊天容器，並隱藏懸浮按鈕自己
+            if (chatContainer != null) {
+                chatContainer.setVisibility(View.VISIBLE);
+            }
+            fabChat.hide();
+        });
+    }
+
+    /**
+     * 提供給 ChatFragment 呼叫的公開方法，用來關閉聊天視窗。
+     */
+    public void closeChatFragment() {
+        // 隱藏聊天容器，並把懸浮按鈕顯示回來
+        if (chatContainer != null) {
+            chatContainer.setVisibility(View.GONE);
+        }
+        if (fabChat != null) {
+            fabChat.show();
+        }
     }
 }

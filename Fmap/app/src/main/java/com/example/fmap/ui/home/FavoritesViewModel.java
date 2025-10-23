@@ -7,7 +7,6 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
-import com.example.fmap.data.FavoritesStore;
 import com.example.fmap.model.Place;
 
 import java.util.ArrayList;
