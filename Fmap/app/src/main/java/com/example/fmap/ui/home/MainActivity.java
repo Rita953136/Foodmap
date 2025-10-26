@@ -1,9 +1,12 @@
+// 檔案路徑: C:/Users/rita9/Documents/Foodmap/Fmap/app/src/main/java/com/example/fmap/ui/home/MainActivity.java
 package com.example.fmap.ui.home;
 
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
@@ -20,11 +23,10 @@ import androidx.fragment.app.FragmentTransaction;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.fmap.R;
-import com.example.fmap.ui.home.chat.ChatFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.google.android.material.floatingactionbutton.FloatingActionButton; // ✨ 匯入 FAB
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
+    // ... (你原有的變數宣告保持不變)
     private DrawerLayout drawerLayout;
     private BottomNavigationView bottomNav;
     private HomeViewModel homeVM;
@@ -43,6 +46,12 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvDate;
     private FloatingActionButton fabChat;
     private View chatContainer;
+
+    // ✨ 新增：用於拖曳按鈕的變數
+    private float dX, dY;
+    private long lastTouchDown;
+    private static final int CLICK_ACTION_THRESHHOLD = 200;
+
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -76,9 +85,10 @@ public class MainActivity extends AppCompatActivity {
             bottomNav.setSelectedItemId(R.id.home);
         }
 
+        // ✨ 已更新為包含閃退修正的邏輯
         setupBackPressLogic();
 
-        // 監聽 Fragment 變化並自動更新 UI
+        // 監聽 Fragment 變化 (保持不變)
         getSupportFragmentManager().addOnBackStackChangedListener(() -> {
             Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
             boolean isHome = currentFragment instanceof HomeFragment;
@@ -99,13 +109,110 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // ✨ 2. 新增：找到並設定懸浮聊天功能
+        // ✨ 已更新為包含可移動按鈕的邏輯
         fabChat = findViewById(R.id.fab_chat);
         chatContainer = findViewById(R.id.chat_fragment_container);
         setupChatFragment();
-        setupFab();
+        setupMovableFab(); // <--- 方法名已修改
     }
 
+    // --- 【方法已更新】 ---
+    /**
+     * 設定懸浮按鈕的觸控事件，使其可拖曳。
+     */
+    private void setupMovableFab() {
+        if (fabChat == null) return;
+
+        fabChat.setOnTouchListener((view, event) -> {
+            // 取得按鈕所在的父容器 (通常是 CoordinatorLayout 或 FrameLayout)
+            ViewGroup.MarginLayoutParams layoutParams = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+            View parentView = (View) view.getParent();
+
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    // 記錄手指按下的時間和相對於按鈕左上角的偏移量
+                    lastTouchDown = System.currentTimeMillis();
+                    dX = view.getX() - event.getRawX();
+                    dY = view.getY() - event.getRawY();
+                    break;
+
+                case MotionEvent.ACTION_MOVE:
+                    // 計算新的 x, y 座標
+                    float newX = event.getRawX() + dX;
+                    float newY = event.getRawY() + dY;
+
+                    // 限制按鈕不能移出父容器的邊界
+                    newX = Math.max(0, newX); // 左邊界
+                    newX = Math.min(parentView.getWidth() - view.getWidth(), newX); // 右邊界
+                    newY = Math.max(0, newY); // 上邊界
+                    newY = Math.min(parentView.getHeight() - view.getHeight(), newY); // 下邊界
+
+                    // 移動按鈕
+                    view.animate()
+                            .x(newX)
+                            .y(newY)
+                            .setDuration(0)
+                            .start();
+                    break;
+
+                case MotionEvent.ACTION_UP:
+                    // 如果按下到放開的時間很短，視為一次「點擊」
+                    if (System.currentTimeMillis() - lastTouchDown < CLICK_ACTION_THRESHHOLD) {
+                        // 執行原本的點擊邏輯
+                        if (chatContainer != null) {
+                            chatContainer.setVisibility(View.VISIBLE);
+                        }
+                        fabChat.hide();
+                    }
+                    break;
+
+                default:
+                    return false;
+            }
+            // 返回 true 表示我們已經完整處理了這個觸控事件
+            return true;
+        });
+    }
+
+    // --- 【方法已更新】 ---
+    /**
+     * 修正返回邏輯，統一處理所有返回事件，避免閃退。
+     */
+    private void setupBackPressLogic() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                Fragment chatFragment = getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container);
+
+                // 1. 優先處理聊天視窗
+                if (chatContainer != null && chatContainer.getVisibility() == View.VISIBLE) {
+                    if (chatFragment instanceof ChatFragment && ((ChatFragment) chatFragment).onBackPressed()) {
+                        return; // WebView 處理了返回事件，結束
+                    }
+                    closeChatFragment();
+                }
+                // 2. 處理側邊抽屜
+                else if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    drawerLayout.closeDrawer(GravityCompat.START);
+                }
+                // 3. 處理 Fragment 返回堆疊
+                else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                    getSupportFragmentManager().popBackStack();
+                }
+                // 4. 如果不在首頁，則切換回首頁
+                else if (bottomNav.getSelectedItemId() != R.id.home) {
+                    bottomNav.setSelectedItemId(R.id.home);
+                }
+                // 5. 如果在首頁，則結束 App
+                else {
+                    finish();
+                }
+            }
+        });
+    }
+
+
+    // --- 以下是你原有的其他方法，保持不變 ---
     public void setHomeToolbar() {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayShowTitleEnabled(false);
@@ -135,8 +242,7 @@ public class MainActivity extends AppCompatActivity {
                         .commit();
             }
             return true;
-        }
-        else if (id == android.R.id.home) {
+        } else if (id == android.R.id.home) {
             getOnBackPressedDispatcher().onBackPressed();
             return true;
         }
@@ -191,85 +297,32 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void setupBackPressLogic() {
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                // ✨ 4. 新增：優先處理聊天視窗的關閉
-                if (chatContainer != null && chatContainer.getVisibility() == View.VISIBLE) {
-                    closeChatFragment();
-                }
-                // --- 以下為你原有的邏輯，保持不變 ---
-                else if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                    drawerLayout.closeDrawer(GravityCompat.START);
-                } else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-                    getSupportFragmentManager().popBackStack();
-                } else if (bottomNav.getSelectedItemId() != R.id.home) {
-                    bottomNav.setSelectedItemId(R.id.home);
-                } else {
-                    finish();
-                }
-            }
-        });
-    }
-
-    /**
-     * 啟用或禁用側邊抽屜和漢堡圖示
-     * @param enabled true 為啟用，false 為禁用
-     */
     public void setDrawerEnabled(boolean enabled) {
         if (drawerLayout == null || toggle == null) return;
-
         int lockMode = enabled ? DrawerLayout.LOCK_MODE_UNLOCKED : DrawerLayout.LOCK_MODE_LOCKED_CLOSED;
         drawerLayout.setDrawerLockMode(lockMode);
-
         toggle.setDrawerIndicatorEnabled(enabled);
-
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(!enabled);
         }
-
         toggle.syncState();
     }
 
-
-    // --- ✨ 5. 新增：以下為控制懸浮聊天功能的全新方法 ✨ ---
-
-    /**
-     * 初始化 ChatFragment，並在預設情況下隱藏它。
-     */
     private void setupChatFragment() {
-        // 檢查 Fragment 是否已存在 (例如螢幕旋轉後)，如果不存在才新增
         if (getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container) == null) {
             getSupportFragmentManager().beginTransaction()
                     .add(R.id.chat_fragment_container, new ChatFragment())
-                    .commitNow(); // 使用 commitNow() 確保 Fragment 立即被建立
+                    .commitNow();
         }
-        // 無論如何，初始狀態下都隱藏聊天容器
         if (chatContainer != null) {
             chatContainer.setVisibility(View.GONE);
         }
     }
 
-    /**
-     * 設定懸浮按鈕的點擊事件。
-     */
-    private void setupFab() {
-        if (fabChat == null) return;
-        fabChat.setOnClickListener(view -> {
-            // 點擊後，顯示聊天容器，並隱藏懸浮按鈕自己
-            if (chatContainer != null) {
-                chatContainer.setVisibility(View.VISIBLE);
-            }
-            fabChat.hide();
-        });
-    }
+    // 這個方法在 setupMovableFab 中已經不需要，因此刪除
+    // private void setupFab() { ... }
 
-    /**
-     * 提供給 ChatFragment 呼叫的公開方法，用來關閉聊天視窗。
-     */
     public void closeChatFragment() {
-        // 隱藏聊天容器，並把懸浮按鈕顯示回來
         if (chatContainer != null) {
             chatContainer.setVisibility(View.GONE);
         }
