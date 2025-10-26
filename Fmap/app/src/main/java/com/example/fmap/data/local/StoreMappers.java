@@ -8,131 +8,71 @@ import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.StringJoiner;
+import java.util.Objects;
 
-/** Entity / Store / Place 之間的轉換 */
+/**
+ * Entity / Store / Place 之間的轉換 (已更新至 Room TypeConverter 版本)
+ */
 public class StoreMappers {
 
-    // 嘗試從 Store 讀 rating（若沒有此欄位/方法就回 null）
-    private static Double readRatingSafely(Store s) {
-        try {
-            java.lang.reflect.Method m = s.getClass().getMethod("getRating");
-            Object v = m.invoke(s);
-            return (v instanceof Number) ? ((Number) v).doubleValue() : null;
-        } catch (Exception ignore) {
-            return null;
-        }
-    }
+    private static final Gson gson = new Gson();
 
-    private static final Gson GSON = new Gson();
-    private static final Type HOURS_TYPE =
-            new TypeToken<Map<String, List<TimeRange>>>(){}.getType();
-
-    // Store(JSON 模型) → Entity
+    // Store (JSON 模型) → StoreEntity (資料庫模型)
     public static StoreEntity toEntity(Store s) {
         if (s == null) return null;
 
-        // 標籤：以 category 為主，不足 3 個用 tags 補
-        StringJoiner tagJoin = new StringJoiner(",");
-        if (s.getCategory() != null) s.getCategory().forEach(tagJoin::add);
-        if (tagJoin.length() < 3 && s.getTags() != null) {
-            for (String t : s.getTags()) {
-                if (tagJoin.length() >= 3) break;
-                tagJoin.add(t);
+        StoreEntity entity = new StoreEntity();
+
+        entity.id = s.getId() != null ? s.getId() : safeSlug(s.getStoreName());
+        entity.storeName = s.getStoreName();
+        entity.address = s.getAddress();
+        entity.lat = s.getLat() != null ? s.getLat() : 0.0;
+        entity.lng = s.getLng() != null ? s.getLng() : 0.0;
+        entity.rating = readRatingSafely(s);
+        entity.phone = s.getPhone();
+        entity.phoneDisplay = s.getPhoneDisplay();
+        entity.category = s.getCategory();
+        entity.tags = s.getTags();
+        entity.menuItems = s.getMenuItems();
+
+        if (s.getImages() != null && s.getImages().isJsonObject()) {
+            // 1. 先將通用的 JsonElement 轉換為更具體的 JsonObject
+            com.google.gson.JsonObject imagesObj = s.getImages().getAsJsonObject();
+
+            // 2. 檢查這個 JsonObject 中是否存在 "cover" 這個鍵
+            if (imagesObj.has("cover")) {
+                // 3. 取出 "cover" 的值，並轉換成字串
+                entity.imageUrl = imagesObj.get("cover").getAsString();
             }
         }
 
-        // 菜單
-        StringJoiner menuJoin = new StringJoiner(",");
-        if (s.getMenuItems() != null) s.getMenuItems().forEach(menuJoin::add);
+        // 使用 Gson 作為中間人，將任何物件轉換成 Map<String, Object>
+        entity.priceRange = convertObjectToMap(s.getPriceRange());
+        entity.businessHours = convertObjectToMap(s.getBusinessHours());
 
-        // 封面（相對路徑或 URL）
-        String coverRaw = s.getCoverPathRaw();
-
-        // 營業時間 → JSON
-        String hoursJson = (s.getBusinessHours() != null)
-                ? GSON.toJson(s.getBusinessHours(), HOURS_TYPE) : null;
-
-        // 價位顯示字串（支援 PriceRange 只有欄位或有 getter 兩種）
-        String priceText = null;
-        if (s.getPriceRange() != null) {
-            Integer min = readInt(s.getPriceRange(), "getMin", "min");
-            Integer max = readInt(s.getPriceRange(), "getMax", "max");
-            priceText = buildPrice(min, max);
-        }
-
-        return new StoreEntity(
-                s.getId() != null ? s.getId() : safeSlug(s.getStoreName()),
-                s.getStoreName(),
-                s.getAddress(),
-                readRatingSafely(s),              // 可能為 null
-                priceText,                        // 友善顯示的價位
-                tagJoin.length() > 0 ? tagJoin.toString() : null,
-                menuJoin.length() > 0 ? menuJoin.toString() : null,
-                s.getLat(), s.getLng(),
-                s.getPhone(),                     // phone
-                coverRaw,                         // coverImage（raw，不加前綴）
-                hoursJson                         // businessHoursJson
-        );
+        return entity;
     }
 
-    // 讀整數欄位：先找 getter，沒有就讀欄位
-    private static Integer readInt(Object obj, String getter, String fieldName) {
-        if (obj == null) return null;
-        try {
-            java.lang.reflect.Method m = obj.getClass().getMethod(getter);
-            Object v = m.invoke(obj);
-            return (v instanceof Number) ? ((Number) v).intValue() : null;
-        } catch (Exception ignore) {
-            try {
-                java.lang.reflect.Field f = obj.getClass().getDeclaredField(fieldName);
-                f.setAccessible(true);
-                Object v = f.get(obj);
-                return (v instanceof Number) ? ((Number) v).intValue() : null;
-            } catch (Exception e) {
-                return null;
-            }
-        }
-    }
-
-    private static String buildPrice(Integer min, Integer max) {
-        if (min == null && max == null) return null;
-        if (min != null && max != null) return "$" + min + "–$" + max;
-        if (min != null) return "≥$" + min;
-        return "≤$" + max;
-    }
-
-    // Entity → Place（供 UI 使用）
+    // StoreEntity (資料庫模型) → Place (UI 顯示模型)
     public static Place toPlace(StoreEntity e) {
         if (e == null) return null;
+
         Place p = new Place();
         p.id = e.id;
-        p.setName(e.name);
+        p.setName(e.storeName);
         p.setAddress(e.address);
-        p.setRating(e.rating);
-        p.setPriceRange(e.priceRange);
-
-        if (e.tags != null && !e.tags.isEmpty()) {
-            p.setTagsTop3(Arrays.asList(e.tags.split(",")));
-        }
-
         p.setLat(e.lat);
         p.setLng(e.lng);
+        p.setRating(e.rating);
         p.setPhone(e.phone);
-        p.setCoverImage(e.coverImage);
-
-        if (e.menuItems != null && !e.menuItems.isEmpty()) {
-            p.setMenuItems(Arrays.asList(e.menuItems.split(",")));
-        }
-
-        if (e.businessHoursJson != null && !e.businessHoursJson.isEmpty()) {
-            Map<String, List<TimeRange>> map = GSON.fromJson(e.businessHoursJson, HOURS_TYPE);
-            p.setBusinessHours(map);
-        }
-
+        p.setTagsTop3(e.category);
+        p.setMenuItems(e.menuItems);
+        p.setBusinessHours(formatBusinessHours(e.businessHours));
+        p.setPriceRange(buildPriceTextFromMap(e.priceRange));
+        p.setCoverImage(e.imageUrl);
+        p.setPhoneDisplay(e.phoneDisplay);
         return p;
     }
 
@@ -146,8 +86,51 @@ public class StoreMappers {
         return result;
     }
 
+    /**
+     * 使用 Gson 作為橋樑，將任意物件轉換為 Map<String, Object>。
+     */
+    private static Map<String, Object> convertObjectToMap(Object obj) {
+        if (obj == null) return null;
+        String json = gson.toJson(obj);
+        Type type = new TypeToken<Map<String, Object>>(){}.getType();
+        return gson.fromJson(json, type);
+    }
+
+    private static double readRatingSafely(Store s) {
+        try {
+            java.lang.reflect.Method m = s.getClass().getMethod("getRating");
+            Object v = m.invoke(s);
+            return (v instanceof Number) ? ((Number) v).doubleValue() : 0.0;
+        } catch (Exception ignore) {
+            return 0.0;
+        }
+    }
+
+    private static String buildPriceTextFromMap(Map<String, Object> priceMap) {
+        if (priceMap == null || priceMap.isEmpty()) return null;
+        Object minObj = priceMap.get("min");
+        Object maxObj = priceMap.get("max");
+        Integer min = (minObj instanceof Number) ? ((Number) minObj).intValue() : null;
+        Integer max = (maxObj instanceof Number) ? ((Number) maxObj).intValue() : null;
+        if (min == null && max == null) return null;
+        if (min != null && Objects.equals(min, max)) return "$" + min;
+        if (min != null && max != null) return "$" + min + "–" + max;
+        if (min != null) return "≥$" + min;
+        return "≤$" + max;
+    }
+
+    private static Map<String, List<TimeRange>> formatBusinessHours(Map<String, Object> rawHours) {
+        if (rawHours == null) return null;
+        String json = gson.toJson(rawHours);
+        // ✨【同時修正這裡】直接使用正確的 TypeToken
+        Type type = new TypeToken<Map<String, List<TimeRange>>>(){}.getType();
+        return gson.fromJson(json, type);
+    }
+
     private static String safeSlug(String name) {
-        if (name == null) return "store_" + System.currentTimeMillis();
-        return name.replaceAll("\\s+", "_");
+        if (name == null || name.isEmpty()) {
+            return "store_" + System.currentTimeMillis();
+        }
+        return name.replace(' ', '-').toLowerCase();
     }
 }

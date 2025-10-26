@@ -19,6 +19,8 @@ import android.widget.RatingBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.util.Log;
+
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -26,6 +28,8 @@ import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
 import com.example.fmap.R;
+import com.example.fmap.data.StoresRepository;
+import com.example.fmap.model.FavoritesStore;
 import com.example.fmap.model.Place;
 import com.example.fmap.model.TimeRange;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
@@ -57,10 +61,11 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
 
     // Data
     private FavoritesStore favoritesStore;
-    private StoreRepository storeRepo;
+    private StoresRepository storeRepo;
     private String placeId;
     private Place currentPlace;
     private boolean isCurrentlyFavorite = false;
+    private java.util.concurrent.ExecutorService executor;
 
     // Views
     private ImageView imgThumb, ivHoursChevron;
@@ -87,7 +92,9 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         favoritesStore = FavoritesStore.getInstance(requireContext());
-        storeRepo = new StoreRepository(requireActivity().getApplication());
+        storeRepo = new StoresRepository(requireActivity().getApplication());
+        executor = java.util.concurrent.Executors.newSingleThreadExecutor(); // ✨ 2. 新增這一行
+
         if (getArguments() != null) {
             placeId = getArguments().getString(ARG_PLACE_ID);
             Object s = getArguments().getSerializable(ARG_PLACE_OBJ);
@@ -162,20 +169,30 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
 
     // ------- 讀取本機資料 -------
     private void loadPlaceDetailsLocal() {
-        storeRepo.getByIds(Collections.singletonList(placeId))
-                .observe(getViewLifecycleOwner(), entities -> {
+        // 使用我們在 onCreate 中初始化的 executor 來執行背景任務
+        executor.execute(() -> {
+            try {
+                // 1. 在背景執行緒中，呼叫 Repository 的 blocking 方法
+                List<com.example.fmap.data.local.StoreEntity> entities = storeRepo.getByIdsBlocking(Collections.singletonList(placeId));
+
+                // --- 後續的處理都必須在主執行緒中更新 UI ---
+                // 使用 requireActivity().runOnUiThread() 來確保程式碼在主執行緒執行
+                requireActivity().runOnUiThread(() -> {
                     if (entities == null || entities.isEmpty()) {
+                        // 如果資料庫查不到，但有備援資料，就用備援的
                         if (currentPlace != null) {
                             return;
-                        } else {
-                            Toast.makeText(getContext(), "找不到該店家資料", Toast.LENGTH_LONG).show();
-                            dismiss();
-                            return;
                         }
+                        // 如果連備援都沒有，就提示錯誤並關閉
+                        Toast.makeText(getContext(), "找不到該店家資料", Toast.LENGTH_LONG).show();
+                        dismiss();
+                        return;
                     }
 
+                    // 2. 將資料庫模型轉換成 UI 模型
                     com.example.fmap.data.local.StoreEntity e = entities.get(0);
                     Place mapped = com.example.fmap.data.local.StoreMappers.toPlace(e);
+
                     if (mapped == null) {
                         if (currentPlace != null) return;
                         Toast.makeText(getContext(), "資料格式錯誤", Toast.LENGTH_LONG).show();
@@ -183,6 +200,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
                         return;
                     }
 
+                    // 3. 更新當前的店家資料並刷新畫面
                     currentPlace = mapped;
                     if (currentPlace.getId() != null) {
                         isCurrentlyFavorite = favoritesStore.contains(currentPlace.getId());
@@ -190,6 +208,15 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
                     updateHeartButtonUI();
                     bindPlaceToViews(currentPlace);
                 });
+
+            } catch (Exception e) {
+                // 如果背景任務出錯，也要在主執行緒提示使用者
+                requireActivity().runOnUiThread(() -> {
+                    Log.e("PlaceDetailFragment", "loadPlaceDetailsLocal failed", e);
+                    Toast.makeText(getContext(), "讀取資料時發生錯誤", Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
     }
 
     private void bindPlaceToViews(@NonNull Place p) {
@@ -499,5 +526,12 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
             }
         });
         return dialog;
+    }
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (executor != null) {
+            executor.shutdown();
+        }
     }
 }

@@ -17,8 +17,6 @@
         android:max="100"
         android:progress="0"
         android:visibility="gone" />
-
-    <!-- ✨ 就是在這裡加上返回按鈕 ✨ -->
     <ImageButton
         android:id="@+id/btn_back"
         android:layout_width="48dp"

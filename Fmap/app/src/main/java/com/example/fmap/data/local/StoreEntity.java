@@ -1,33 +1,47 @@
+// ✨✨✨ 請複製這整段程式碼，完全覆蓋你的 StoreEntity.java (最終版) ✨✨✨
+
 package com.example.fmap.data.local;
 
 import androidx.annotation.NonNull;
+import androidx.room.ColumnInfo;
+import androidx.room.Entity;
+import androidx.room.PrimaryKey;
+import java.util.List;
+import java.util.Map;
 
-/**
- * 簡化的本地實體（現在不強制 Room，先當 POJO 使用）
- * 若要改用 Room，只需加上 @Entity/@PrimaryKey 等註解即可。
- */
+@Entity(tableName = "stores")
 public class StoreEntity {
-    @NonNull public String id;
 
-    public String name;
+    @PrimaryKey
+    @NonNull
+    public String id = ""; // 給一個預設值避免 null
+
+    @ColumnInfo(name = "store_name")
+    public String storeName;
+
+    // 使用轉換器儲存 List<String>
+    public List<String> category;
+    public List<String> tags;
+    public List<String> menuItems;
+
+    // 使用轉換器儲存複雜的 Map 物件
+    @ColumnInfo(name = "price_range")
+    public Map<String, Object> priceRange;
+    @ColumnInfo(name = "image_url")
+    public String imageUrl;
     public String address;
-    public Double rating;       // 若 JSON 沒有就留 null
-    public String priceRange;   // 存文字格式
-    public String tags;         // 逗號分隔
-    public String menuItems;    // 逗號分隔
-    public Double lat;
-    public Double lng;
-    public String phone;               // 電話
-    public String coverImage;          // 封面圖相對路徑或 URL（e.g. stores/.../cover.jpg 或 https://...）
-    public String businessHoursJson;   // 營業時間 Map 的 JSON 字串
-    public String imagePath;
-    public StoreEntity(@NonNull String id, String name, String address, Double rating,
-                       String priceRange, String tags, String menuItems,
-                       Double lat, Double lng,
-                       String phone, String coverImage, String businessHoursJson) {
-        this.id = id; this.name = name; this.address = address; this.rating = rating;
-        this.priceRange = priceRange; this.tags = tags; this.menuItems = menuItems;
-        this.lat = lat; this.lng = lng;
-        this.phone = phone; this.coverImage = coverImage; this.businessHoursJson = businessHoursJson;
-    }
+    public String phone;
+
+    @ColumnInfo(name = "phone_display")
+    public String phoneDisplay; // 這個本身就是字串，可以直接存
+
+    @ColumnInfo(name = "business_hours")
+    public Map<String, Object> businessHours;
+
+    public double lat;
+    public double lng;
+    public double rating;
+
+    // Room 需要一個無參數的建構子
+    public StoreEntity() {}
 }

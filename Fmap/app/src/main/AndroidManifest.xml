@@ -16,6 +16,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+        android:hardwareAccelerated="true"
         tools:targetApi="31">
 
         <!-- Maps API Key：必須放在 <application> 內 -->

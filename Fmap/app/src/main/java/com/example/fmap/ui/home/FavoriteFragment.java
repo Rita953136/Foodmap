@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.R;
+import com.example.fmap.model.FavoritesStore;
 import com.example.fmap.model.Place;
 
 import java.util.List;

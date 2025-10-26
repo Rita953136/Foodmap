@@ -1,11 +1,10 @@
-package com.example.fmap.ui.home;
+package com.example.fmap.model;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 
 import androidx.annotation.Nullable;
 
-import com.example.fmap.model.Place;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 

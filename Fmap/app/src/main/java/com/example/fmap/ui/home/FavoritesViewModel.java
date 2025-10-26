@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.fmap.model.FavoritesStore;
 import com.example.fmap.model.Place;
 
 import java.util.ArrayList;
@@ -22,7 +23,6 @@ public class FavoritesViewModel extends AndroidViewModel {
 
     public FavoritesViewModel(@NonNull Application app) {
         super(app);
-        // ✅ 改為使用單例取得 FavoritesStore
         store = FavoritesStore.getInstance(app.getApplicationContext());
     }
 

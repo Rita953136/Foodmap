@@ -1,45 +1,40 @@
+
 package com.example.fmap.model;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map; // 確保 import 了 Map
 import java.util.Objects;
 
-/**
- * Place：UI 層使用的店家資料模型。
- * - 來源可為 StoreEntity（本地）或 Firestore（若未來擴充）。
- * - 不依賴 Android 元件，可安全序列化或放入 LiveData。
- */
 public class Place implements Serializable {
 
     // ---- 基本資料 ----
-    public String id;              // 唯一 ID
-    private String name;           // 店名
-    private String address;        // 地址
-    private Double rating;         // 評分
-    private Integer ratingCount;   // 評論數
+    public String id;
+    private String name;
+    private String address;
+    private Double rating;
+    private Integer ratingCount;
 
     // ---- 標籤與分類 ----
-    private List<String> tagsTop3; // 主要標籤 (如 ["拉麵","湯頭好","環境佳"])
-    private String priceRange;     // 價位字串（例如 "$200-400"）
+    private List<String> tagsTop3;
+    private String priceRange;
 
     // ---- 其他屬性 ----
     private Double lat;
     private Double lng;
     private String phone;
-    private String coverImage;     // 主要圖片 URL
-    private List<String> menuItems; // 菜單項目
+    private String phoneDisplay;
+    private String coverImage;
+    private List<String> menuItems;
 
+    // ---- 營業時間 ----
+    private Map<String, List<TimeRange>> businessHours;
 
     // ---- 建構子 ----
     public Place() {}
 
-    public Place(String id, String name, String address, Double rating) {
-        this.id = id;
-        this.name = name;
-        this.address = address;
-        this.rating = rating;
-    }
+    // ... 其他建構子 ...
 
     // ---- Getter / Setter ----
     public String getId() { return id; }
@@ -72,10 +67,13 @@ public class Place implements Serializable {
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
 
+    // ✨ 2. 為 phoneDisplay 新增 getter 和 setter
+    public String getPhoneDisplay() { return phoneDisplay; }
+    public void setPhoneDisplay(String phoneDisplay) { this.phoneDisplay = phoneDisplay; }
+
     public String getCoverImage() { return coverImage; }
     public void setCoverImage(String coverImage) { this.coverImage = coverImage; }
 
-    // ---- 封面圖片完整路徑（自動補上 assets 前綴）----
     public String getCoverImageFullPath() {
         if (coverImage == null || coverImage.isEmpty()) return null;
         if (!coverImage.startsWith("http") && !coverImage.startsWith("file:///")) {
@@ -83,46 +81,19 @@ public class Place implements Serializable {
         }
         return coverImage;
     }
-    // ---- 營業時間 ----
-    private java.util.Map<String, java.util.List<com.example.fmap.model.TimeRange>> businessHours;
 
-    public java.util.Map<String, java.util.List<com.example.fmap.model.TimeRange>> getBusinessHours() {
+    public Map<String, List<TimeRange>> getBusinessHours() {
         return businessHours;
     }
 
-    public void setBusinessHours(java.util.Map<String, java.util.List<com.example.fmap.model.TimeRange>> businessHours) {
+    public void setBusinessHours(Map<String, List<TimeRange>> businessHours) {
         this.businessHours = businessHours;
     }
+
     public List<String> getMenuItems() { return menuItems; }
     public void setMenuItems(List<String> menuItems) { this.menuItems = menuItems; }
 
-    // ---- 實用方法 ----
-    public boolean hasAllTags(List<String> required) {
-        if (required == null || required.isEmpty()) return true;
-        if (tagsTop3 == null) return false;
-        return tagsTop3.containsAll(required);
-    }
-
-    public boolean hasAnyTag(List<String> any) {
-        if (any == null || any.isEmpty()) return true;
-        if (tagsTop3 == null) return false;
-        for (String t : any) if (tagsTop3.contains(t)) return true;
-        return false;
-    }
-
-    public List<String> safeTags() {
-        return tagsTop3 != null ? new ArrayList<>(tagsTop3) : new ArrayList<>();
-    }
-
-    @Override
-    public String toString() {
-        return "Place{" +
-                "id='" + id + '\'' +
-                ", name='" + name + '\'' +
-                ", rating=" + rating +
-                ", tags=" + tagsTop3 +
-                '}';
-    }
+    // ... 其他實用方法 ...
 
     @Override
     public boolean equals(Object o) {

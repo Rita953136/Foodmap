@@ -1,12 +1,15 @@
 // 檔案路徑: C:/Users/rita9/Documents/Foodmap/Fmap/app/src/main/java/com/example/fmap/ui/home/MainActivity.java
 package com.example.fmap.ui.home;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
+import android.view.ViewConfiguration;
 import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
@@ -31,50 +34,46 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
-    // ... (你原有的變數宣告保持不變)
     private DrawerLayout drawerLayout;
     private BottomNavigationView bottomNav;
     private HomeViewModel homeVM;
-    private Toolbar toolbar;
     private ActionBarDrawerToggle toggle;
-
     private TextView tvTitle;
     private TextView tvDate;
     private FloatingActionButton fabChat;
     private View chatContainer;
-
-    // ✨ 新增：用於拖曳按鈕的變數
     private float dX, dY;
     private long lastTouchDown;
-    private static final int CLICK_ACTION_THRESHHOLD = 200;
+    private static final int CLICK_ACTION_THRESHOLD = ViewConfiguration.getTapTimeout();
 
+    // === 發送到 ChatFragment 用的 debounce ===
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable tagsDebounceTask = null;
+    private static final long TAGS_DEBOUNCE_MS = 250;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
 
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayShowTitleEnabled(false);
-        }
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayShowTitleEnabled(false);
 
         tvTitle = findViewById(R.id.tvTitle);
-        tvDate = findViewById(R.id.tvDate);
+        tvDate  = findViewById(R.id.tvDate);
 
         drawerLayout = findViewById(R.id.drawer_layout);
-        toggle = new ActionBarDrawerToggle(
-                this, drawerLayout, toolbar, R.string.open_nav, R.string.close_nav);
+        toggle = new ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.open_nav, R.string.close_nav);
         drawerLayout.addDrawerListener(toggle);
         toggle.syncState();
 
         homeVM = new ViewModelProvider(this).get(HomeViewModel.class);
-
         setupDrawerChips();
         setupBottomNav();
 
@@ -85,138 +84,78 @@ public class MainActivity extends AppCompatActivity {
             bottomNav.setSelectedItemId(R.id.home);
         }
 
-        // ✨ 已更新為包含閃退修正的邏輯
         setupBackPressLogic();
 
-        // 監聽 Fragment 變化 (保持不變)
-        getSupportFragmentManager().addOnBackStackChangedListener(() -> {
-            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-            boolean isHome = currentFragment instanceof HomeFragment;
-            setDrawerEnabled(isHome);
-
-            if (isHome) {
-                setHomeToolbar();
-            } else if (currentFragment instanceof TrashFragment) {
-                if (getSupportActionBar() != null) {
-                    if (tvTitle != null && tvDate != null) {
-                        tvTitle.setVisibility(View.GONE);
-                        tvDate.setVisibility(View.GONE);
-                    }
-                    getSupportActionBar().setDisplayHomeAsUpEnabled(false);
-                    toggle.setDrawerIndicatorEnabled(false);
-                    getSupportActionBar().setDisplayShowTitleEnabled(true);
-                }
-            }
-        });
-
-        // ✨ 已更新為包含可移動按鈕的邏輯
         fabChat = findViewById(R.id.fab_chat);
         chatContainer = findViewById(R.id.chat_fragment_container);
         setupChatFragment();
-        setupMovableFab(); // <--- 方法名已修改
+        setupMovableFab();
     }
 
-    // --- 【方法已更新】 ---
-    /**
-     * 設定懸浮按鈕的觸控事件，使其可拖曳。
-     */
+    // ====== 懸浮按鈕可拖曳 + 開關聊天 ======
+    @SuppressLint("ClickableViewAccessibility")
     private void setupMovableFab() {
         if (fabChat == null) return;
+        fabChat.setOnClickListener(v -> {
+            if (chatContainer != null) chatContainer.setVisibility(View.VISIBLE);
+            fabChat.hide();
+            // 打開時把目前選中標籤同步一次到 ChatFragment
+            pushSelectedTagsToChatFragment();
+        });
 
         fabChat.setOnTouchListener((view, event) -> {
-            // 取得按鈕所在的父容器 (通常是 CoordinatorLayout 或 FrameLayout)
-            ViewGroup.MarginLayoutParams layoutParams = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
-            View parentView = (View) view.getParent();
-
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    // 記錄手指按下的時間和相對於按鈕左上角的偏移量
                     lastTouchDown = System.currentTimeMillis();
                     dX = view.getX() - event.getRawX();
                     dY = view.getY() - event.getRawY();
-                    break;
-
-                case MotionEvent.ACTION_MOVE:
-                    // 計算新的 x, y 座標
+                    return true;
+                case MotionEvent.ACTION_MOVE: {
                     float newX = event.getRawX() + dX;
                     float newY = event.getRawY() + dY;
-
-                    // 限制按鈕不能移出父容器的邊界
-                    newX = Math.max(0, newX); // 左邊界
-                    newX = Math.min(parentView.getWidth() - view.getWidth(), newX); // 右邊界
-                    newY = Math.max(0, newY); // 上邊界
-                    newY = Math.min(parentView.getHeight() - view.getHeight(), newY); // 下邊界
-
-                    // 移動按鈕
-                    view.animate()
-                            .x(newX)
-                            .y(newY)
-                            .setDuration(0)
-                            .start();
-                    break;
-
+                    View parent = (View) view.getParent();
+                    newX = Math.max(0, Math.min(parent.getWidth() - view.getWidth(), newX));
+                    newY = Math.max(0, Math.min(parent.getHeight() - view.getHeight(), newY));
+                    view.animate().x(newX).y(newY).setDuration(0).start();
+                    return true;
+                }
                 case MotionEvent.ACTION_UP:
-                    // 如果按下到放開的時間很短，視為一次「點擊」
-                    if (System.currentTimeMillis() - lastTouchDown < CLICK_ACTION_THRESHHOLD) {
-                        // 執行原本的點擊邏輯
-                        if (chatContainer != null) {
-                            chatContainer.setVisibility(View.VISIBLE);
-                        }
-                        fabChat.hide();
+                    if (System.currentTimeMillis() - lastTouchDown < CLICK_ACTION_THRESHOLD) {
+                        view.performClick();
                     }
-                    break;
-
-                default:
-                    return false;
+                    return true;
             }
-            // 返回 true 表示我們已經完整處理了這個觸控事件
-            return true;
+            return false;
         });
     }
 
-    // --- 【方法已更新】 ---
-    /**
-     * 修正返回邏輯，統一處理所有返回事件，避免閃退。
-     */
+    // ====== 返回鍵邏輯 ======
     private void setupBackPressLogic() {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
+            @Override public void handleOnBackPressed() {
                 Fragment chatFragment = getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container);
 
-                // 1. 優先處理聊天視窗
                 if (chatContainer != null && chatContainer.getVisibility() == View.VISIBLE) {
                     if (chatFragment instanceof ChatFragment && ((ChatFragment) chatFragment).onBackPressed()) {
-                        return; // WebView 處理了返回事件，結束
+                        return;
                     }
                     closeChatFragment();
-                }
-                // 2. 處理側邊抽屜
-                else if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                } else if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
                     drawerLayout.closeDrawer(GravityCompat.START);
-                }
-                // 3. 處理 Fragment 返回堆疊
-                else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                } else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
                     getSupportFragmentManager().popBackStack();
-                }
-                // 4. 如果不在首頁，則切換回首頁
-                else if (bottomNav.getSelectedItemId() != R.id.home) {
+                } else if (bottomNav.getSelectedItemId() != R.id.home) {
                     bottomNav.setSelectedItemId(R.id.home);
-                }
-                // 5. 如果在首頁，則結束 App
-                else {
+                } else {
                     finish();
                 }
             }
         });
     }
 
-
-    // --- 以下是你原有的其他方法，保持不變 ---
+    // ====== Toolbar 顯示 ======
     public void setHomeToolbar() {
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayShowTitleEnabled(false);
-        }
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayShowTitleEnabled(false);
         if (tvTitle != null && tvDate != null) {
             tvTitle.setVisibility(View.VISIBLE);
             tvDate.setVisibility(View.VISIBLE);
@@ -229,16 +168,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
-
         if (id == R.id.action_trash) {
-            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-
-            if (currentFragment instanceof TrashFragment) {
+            Fragment current = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+            if (current instanceof TrashFragment) {
                 getOnBackPressedDispatcher().onBackPressed();
             } else {
                 getSupportFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new TrashFragment())
-                        .addToBackStack(null) // 加入返回堆疊
+                        .addToBackStack(null)
                         .commit();
             }
             return true;
@@ -246,7 +183,6 @@ public class MainActivity extends AppCompatActivity {
             getOnBackPressedDispatcher().onBackPressed();
             return true;
         }
-
         return super.onOptionsItemSelected(item);
     }
 
@@ -256,40 +192,94 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    // ====== Drawer Chips → VM + 同步到 ChatFragment 可見小卡 ======
     private void setupDrawerChips() {
         ChipGroup chipGroup = findViewById(R.id.chip_group_tags);
         if (chipGroup == null) return;
+
         chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
-            List<String> selected = new ArrayList<>();
+            final LinkedHashSet<String> selectedSet = new LinkedHashSet<>();
             for (Integer id : checkedIds) {
                 Chip c = group.findViewById(id);
-                if (c != null) {
-                    selected.add(c.getText().toString().trim());
+                if (c != null && c.getText() != null) {
+                    String t = c.getText().toString().trim();
+                    if (!t.isEmpty()) selectedSet.add(t);
                 }
             }
-            homeVM.applyTagFilter(selected);
+
+            // 1) 原本：通知 VM 做本地篩選
+            homeVM.applyTagFilter(new ArrayList<>(selectedSet));
+
+            // 2) 同步到 ChatFragment（顯示附件小卡，支援叉叉回呼）
+            Fragment f = getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container);
+            if (f instanceof ChatFragment) {
+                ChatFragment cf = (ChatFragment) f;
+
+                // 設定（或覆蓋）一次回呼：WebView 點叉叉 → 取消對應 Chip
+                cf.setOnTagRemoveListener(tag -> {
+                    ChipGroup g2 = findViewById(R.id.chip_group_tags);
+                    if (g2 == null) return;
+                    for (int i = 0; i < g2.getChildCount(); i++) {
+                        View v2 = g2.getChildAt(i);
+                        if (v2 instanceof Chip) {
+                            Chip chip = (Chip) v2;
+                            CharSequence tx = chip.getText();
+                            if (tx != null && tx.toString().trim().equals(tag)) {
+                                chip.setChecked(false); // 會觸發本方法，再次同步 VM + WebView
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                // debounce 推送（避免 evaluateJavascript 太頻繁）
+                if (tagsDebounceTask != null) handler.removeCallbacks(tagsDebounceTask);
+                final List<String> listForUi = new ArrayList<>(selectedSet);
+                tagsDebounceTask = () -> cf.updateVisibleTags(listForUi);
+                handler.postDelayed(tagsDebounceTask, TAGS_DEBOUNCE_MS);
+            }
         });
     }
 
+    // 按一下 FAB 打開聊天時，同步一次目前已選標籤
+    private void pushSelectedTagsToChatFragment() {
+        ChipGroup chipGroup = findViewById(R.id.chip_group_tags);
+        if (chipGroup == null) return;
+
+        final LinkedHashSet<String> selectedSet = new LinkedHashSet<>();
+        for (int i = 0; i < chipGroup.getChildCount(); i++) {
+            View v = chipGroup.getChildAt(i);
+            if (v instanceof Chip) {
+                Chip c = (Chip) v;
+                if (c.isChecked() && c.getText() != null) {
+                    String t = c.getText().toString().trim();
+                    if (!t.isEmpty()) selectedSet.add(t);
+                }
+            }
+        }
+
+        Fragment f = getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container);
+        if (f instanceof ChatFragment) {
+            ((ChatFragment) f).updateVisibleTags(new ArrayList<>(selectedSet));
+        }
+    }
+
+    // ====== Bottom Nav ======
     private void setupBottomNav() {
         bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setOnItemSelectedListener(item -> {
-            if (bottomNav.getSelectedItemId() == item.getItemId()) {
-                return false;
-            }
-            Fragment targetFragment = null;
+            if (bottomNav.getSelectedItemId() == item.getItemId()) return false;
+
+            Fragment target = null;
             int id = item.getItemId();
-            if (id == R.id.home) {
-                targetFragment = new HomeFragment();
-            } else if (id == R.id.map) {
-                targetFragment = new MapFragment();
-            } else if (id == R.id.favorite) {
-                targetFragment = new FavoriteFragment();
-            }
-            if (targetFragment != null) {
+            if (id == R.id.home)      target = new HomeFragment();
+            else if (id == R.id.map)  target = new MapFragment();
+            else if (id == R.id.favorite) target = new FavoriteFragment();
+
+            if (target != null) {
                 getSupportFragmentManager().popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
                 getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, targetFragment)
+                        .replace(R.id.fragment_container, target)
                         .setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE)
                         .commit();
             }
@@ -314,20 +304,11 @@ public class MainActivity extends AppCompatActivity {
                     .add(R.id.chat_fragment_container, new ChatFragment())
                     .commitNow();
         }
-        if (chatContainer != null) {
-            chatContainer.setVisibility(View.GONE);
-        }
+        if (chatContainer != null) chatContainer.setVisibility(View.GONE);
     }
 
-    // 這個方法在 setupMovableFab 中已經不需要，因此刪除
-    // private void setupFab() { ... }
-
     public void closeChatFragment() {
-        if (chatContainer != null) {
-            chatContainer.setVisibility(View.GONE);
-        }
-        if (fabChat != null) {
-            fabChat.show();
-        }
+        if (chatContainer != null) chatContainer.setVisibility(View.GONE);
+        if (fabChat != null) fabChat.show();
     }
 }

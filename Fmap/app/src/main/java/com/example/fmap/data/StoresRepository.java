@@ -1,3 +1,5 @@
+// ✨✨✨ 請複製這整段程式碼，完全覆蓋你的 StoresRepository.java ✨✨✨
+
 package com.example.fmap.data;
 
 import android.app.Application;
@@ -8,6 +10,8 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.fmap.data.local.StoreDao;
+import com.example.fmap.data.local.StoreDatabase;
 import com.example.fmap.data.local.StoreEntity;
 import com.example.fmap.data.local.StoreMappers;
 import com.example.fmap.model.Store;
@@ -22,42 +26,51 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-/**
- * 純本機 JSON 版資料倉儲：
- * - 讀取 assets/stores_info_normalized.json
- * - 對外提供 LiveData 查詢
- * - 與 HomeViewModel 的介面一致（initFromAssets / getDbReady / searchAdvanced / getByIds）
- */
 public class StoresRepository {
 
     private static final String TAG = "StoresRepository";
     private static final String ASSET_FILE = "stores_info_normalized.json";
 
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final MutableLiveData<Boolean> dbReady = new MutableLiveData<>(false);
-
-    /** 以 Entity 形式存於記憶體（若改用 Room，可直接替換來源） */
-    private final List<StoreEntity> inMemory = new ArrayList<>();
     private final Gson gson = new Gson();
 
-    public StoresRepository(Application app) {}
+    private final StoreDao storeDao;
+    // ✨【改造點 1】: 取得資料庫的背景執行緒池
+    private final ExecutorService databaseExecutor;
 
-    public LiveData<Boolean> getDbReady() { return dbReady; }
+    public StoresRepository(Application app) {
+        StoreDatabase db = StoreDatabase.getDatabase(app);
+        this.storeDao = db.storeDao();
+        this.databaseExecutor = StoreDatabase.databaseWriteExecutor; // 從 StoreDatabase 取得共用的執行緒池
+    }
 
-    /** 第一次啟動時呼叫；讀取 assets JSON 載入到記憶體 */
+    public LiveData<Boolean> getDbReady() {
+        return dbReady;
+    }
+
     public void initFromAssets(Context ctx) {
-        io.execute(() -> {
+        databaseExecutor.execute(() -> {
             try {
-                List<Store> raw = readStoresFromAssets(ctx.getAssets(), ASSET_FILE);
-                inMemory.clear();
-                for (Store s : raw) {
-                    StoreEntity e = StoreMappers.toEntity(s);
-                    if (e != null) inMemory.add(e);
+                if (storeDao.count() > 0) {
+                    Log.d(TAG, "資料庫已存在，跳過初始化。");
+                    dbReady.postValue(true);
+                    return;
                 }
+
+                Log.d(TAG, "資料庫為空，開始從 JSON 初始化...");
+                List<Store> raw = readStoresFromAssets(ctx.getAssets(), ASSET_FILE);
+                List<StoreEntity> entities = new ArrayList<>();
+                for (Store s : raw) {
+                    // 使用我們更新過的 StoreMappers
+                    StoreEntity e = StoreMappers.toEntity(s);
+                    if (e != null) entities.add(e);
+                }
+
+                storeDao.insertAll(entities);
+                Log.d(TAG, "資料庫初始化完成，共寫入 " + entities.size() + " 筆資料。");
+
                 dbReady.postValue(true);
             } catch (Exception e) {
                 Log.e(TAG, "initFromAssets failed", e);
@@ -65,101 +78,39 @@ public class StoresRepository {
             }
         });
     }
-    // 在 StoresRepository 裡加：
-    public LiveData<List<StoreEntity>> getAll() {
-        MutableLiveData<List<StoreEntity>> live = new MutableLiveData<>();
-        io.execute(() -> live.postValue(new ArrayList<>(inMemory)));
-        return live;
+
+    /**
+     * 在背景執行緒中，從 Room 資料庫執行進階搜尋。
+     * 這個方法接收 ViewModel 傳來的 5 個參數，然後把它們傳遞給 DAO。
+     * @return 一個包含 StoreEntity 的列表 (注意：不是 LiveData)。
+     */
+    public List<StoreEntity> searchAdvancedBlocking(String keyword, String category, int catCount, String dishLike, String priceEq) {
+        Log.d("StoresRepository", "在資料庫中執行搜尋: keyword=" + keyword + ", category=" + category);
+
+        // 直接呼叫 DAO 的 blocking 方法，將接收到的 5 個參數，原封不動地傳遞給 DAO。
+        return storeDao.searchAdvancedBlocking(keyword, category, catCount, dishLike, priceEq);
+    }
+
+    // ✨✨✨【核心改造 3：getByIdsBlocking】✨✨✨
+    /**
+     * 在背景執行緒中，根據 ID 列表從 Room 資料庫取得店家資料。
+     * @return 一個包含 StoreEntity 的列表。
+     */
+    public List<StoreEntity> getByIdsBlocking(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // 直接呼叫 DAO 的 blocking 方法
+        return storeDao.getByIdsBlocking(ids);
     }
 
 
-    /** 關鍵字 + 類別(用 tags 判斷) + 菜名包含 + 價位等值 之簡易查詢 */
-    public LiveData<List<StoreEntity>> searchAdvanced(String keyword,
-                                                      List<String> categories,
-                                                      String dishLike,
-                                                      String priceEq) {
-        MutableLiveData<List<StoreEntity>> live = new MutableLiveData<>();
-        io.execute(() -> {
-            boolean noKeyword  = keyword == null  || keyword.trim().isEmpty();
-            boolean noCats     = categories == null || categories.isEmpty();
-            boolean noDish     = dishLike == null || dishLike.trim().isEmpty();
-            boolean noPrice    = priceEq == null || priceEq.trim().isEmpty();
-
-            // ★ 沒有任何條件 → 直接回全部
-            if (noKeyword && noCats && noDish && noPrice) {
-                live.postValue(new ArrayList<>(inMemory));
-                return;
-            }
-
-            // 有條件 → 做原本的過濾
-            String kw   = safeLower(keyword);
-            String dish = safeLower(dishLike);
-            String price= safeLower(priceEq);
-
-            List<StoreEntity> result = new ArrayList<>();
-            for (StoreEntity s : inMemory) {
-                boolean ok = true;
-
-                if (!noKeyword) {
-                    String source = (safeLower(s.name) + " " + safeLower(s.address));
-                    ok = source.contains(kw);
-                    if (!ok) continue;
-                }
-
-                if (!noCats) {
-                    ok = false;
-                    String tagStr = safeLower(s.tags);
-                    for (String c : categories) {
-                        if (c != null && !c.isEmpty() && tagStr.contains(safeLower(c))) {
-                            ok = true; break;
-                        }
-                    }
-                    if (!ok) continue;
-                }
-
-                if (!noDish) {
-                    String menu = safeLower(s.menuItems);
-                    ok = menu.contains(dish);
-                    if (!ok) continue;
-                }
-
-                if (!noPrice && s.priceRange != null) {
-                    ok = safeLower(s.priceRange).equals(price);
-                    if (!ok) continue;
-                }
-
-                result.add(s);
-            }
-            live.postValue(result);
-        });
-        return live;
-    }
-
-
-    /** 依多個 id 取回資料（供垃圾桶頁面用） */
-    public LiveData<List<StoreEntity>> getByIds(List<String> ids) {
-        MutableLiveData<List<StoreEntity>> live = new MutableLiveData<>();
-        io.execute(() -> {
-            if (ids == null || ids.isEmpty()) { live.postValue(new ArrayList<>()); return; }
-            List<StoreEntity> out = new ArrayList<>();
-            for (StoreEntity s : inMemory) {
-                if (ids.contains(s.id)) out.add(s);
-            }
-            live.postValue(out);
-        });
-        return live;
-    }
-
-    // ---------------- internal helpers ----------------
+    // --- internal helpers (保持不變) ---
     private List<Store> readStoresFromAssets(AssetManager am, String filename) throws Exception {
         try (InputStream is = am.open(filename);
              BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            Type listType = new TypeToken<List<Store>>(){}.getType();
+            Type listType = new TypeToken<List<Store>>() {}.getType();
             return gson.fromJson(br, listType);
         }
-    }
-
-    private static String safeLower(String s) {
-        return s == null ? "" : s.toLowerCase(Locale.ROOT);
     }
 }
