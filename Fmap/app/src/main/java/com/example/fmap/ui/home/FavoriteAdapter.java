@@ -110,10 +110,10 @@ public class FavoriteAdapter extends RecyclerView.Adapter<FavoriteAdapter.Favori
                 tvTags.setVisibility(View.GONE);
             }
 
-            // 圖片（Place 使用 coverImage）
-            String cover = place.getCoverImage();
+            // 圖片
+            String coverFullPath = place.getCoverImageFullPath(); // <--- 把 getCoverImage() 改成這個！
             Glide.with(context)
-                    .load(cover)
+                    .load(coverFullPath) // <--- 使用這個完整路徑來載入
                     .centerCrop()
                     .placeholder(R.color.material_dynamic_neutral80)
                     .error(R.color.material_dynamic_neutral80)

@@ -149,6 +149,13 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
             }
         });
     }
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setDrawerEnabled(true);
+        }
+    }
 
     @Override
     public void onPlaceClick(Place place) {

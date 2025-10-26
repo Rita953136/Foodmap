@@ -29,7 +29,9 @@ public class TrashFragment extends Fragment implements TrashCardAdapter.OnTrashA
 
     private TrashCardAdapter adapter;
     private HomeViewModel viewModel;
-
+    public static TrashFragment newInstance() {
+        return new TrashFragment();
+    }
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -108,13 +110,21 @@ public class TrashFragment extends Fragment implements TrashCardAdapter.OnTrashA
     @Override
     public void onRestore(@NonNull Place place, int position) {
         if (place.getId() == null) return;
+        // 1.只需要通知 ViewModel 處理業務邏輯
         viewModel.removeFromDislikes(place.getId());
-        adapter.removeAt(position);
-        if (adapter.getItemCount() == 0) {
-            tvEmpty.setVisibility(View.VISIBLE);
-        }
+        // 2. 顯示一個提示，讓使用者知道操作已觸發
         Toast.makeText(getContext(),
-                "已復原：「" + (place.getName() != null ? place.getName() : "") + "」",
+                "已還原：「" + (place.getName() != null ? place.getName() : "") + "」",
                 Toast.LENGTH_SHORT).show();
     }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setDrawerEnabled(true);
+        }
+    }
+
+
 }

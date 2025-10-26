@@ -272,7 +272,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
 
         // 標籤 & 菜單
         // 只顯示標籤，不顯示菜單
-        bindChips(chipGroupTags, p.getTagsTop3(), false);
+        //bindChips(chipGroupTags, p.getTagsTop3(), false);
         if (chipGroupMenu != null) {
             chipGroupMenu.removeAllViews();
             chipGroupMenu.setVisibility(View.GONE);

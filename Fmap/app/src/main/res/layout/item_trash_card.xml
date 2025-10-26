@@ -1,155 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ✨✨✨【風格優化版本】用這個版本完整取代你的 item_trash_card.xml ✨✨✨ -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
+    android:layout_marginHorizontal="16dp"
     android:layout_marginVertical="8dp"
-    app:cardBackgroundColor="@android:color/white"
-    app:cardCornerRadius="20dp"
-    app:cardElevation="6dp"
-    app:cardPreventCornerOverlap="true"
-    app:cardUseCompatPadding="false"
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp"
     app:strokeWidth="0dp">
 
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
         <!-- 上半：圖片 -->
         <ImageView
             android:id="@+id/imgThumb"
             android:layout_width="match_parent"
-            android:layout_height="230dp"
-            android:background="#EDEDED"
-            android:scaleType="centerCrop" />
+            android:layout_height="200dp"
+            android:background="?attr/colorSurfaceVariant"
+            android:scaleType="centerCrop"
+            tools:src="@tools:sample/backgrounds/scenic" />
 
-        <!-- 下半：文字區（白底） -->
+        <!-- 下半：文字區 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@id/imgThumb"
-            android:background="@android:color/white"
             android:orientation="vertical"
-            android:paddingLeft="12dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:paddingTop="12dp"
-            android:paddingRight="12dp"
-            android:paddingBottom="14dp">
+            android:paddingBottom="16dp">
 
             <!-- 第一行：店名 + 評分 -->
-            <androidx.constraintlayout.widget.ConstraintLayout
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
+                <!-- 店名 -->
                 <TextView
                     android:id="@+id/tvName"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_toStartOf="@id/ratingRow"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:textSize="18sp"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:textStyle="bold"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toStartOf="@+id/ratingRow"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
+                    tools:text="這是一間店名非常非常長的店家" />
 
+                <!-- 評分 -->
                 <LinearLayout
                     android:id="@+id/ratingRow"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent">
+                    android:orientation="horizontal">
 
-                    <ImageView
-                        android:id="@+id/ivStar"
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@android:drawable/btn_star_big_on"
-                        app:tint="#FFC107" />
+                    <RatingBar
+                        android:id="@+id/ratingBar"
+                        style="?attr/ratingBarStyleSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:isIndicator="true"
+                        android:numStars="5"
+                        android:stepSize="0.1"
+                        tools:rating="4.3" />
+
 
                     <TextView
                         android:id="@+id/tvRating"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:layout_marginStart="6dp"
+                        android:textAppearance="?attr/textAppearanceLabelMedium"
+                        tools:text="4.3" />
                 </LinearLayout>
-            </androidx.constraintlayout.widget.ConstraintLayout>
+            </RelativeLayout>
 
             <!-- 第二行：標籤 -->
             <TextView
                 android:id="@+id/tvTags"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="4dp"
                 android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
-                android:textColor="#555555"
-                android:textSize="13sp" />
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                tools:text="#日式料理 #壽司 #丼飯" />
 
-            <!-- 第三行：操作（垃圾桶專用） -->
-            <LinearLayout
-                android:id="@+id/actionRow"
+            <!-- 第三行：操作按鈕（還原、刪除） -->
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
+                android:layout_marginTop="12dp">
 
-                <!-- 第三行：操作（垃圾桶專用） -->
-                <RelativeLayout
-                    android:layout_width="match_parent"
+                <!-- 左邊：還原 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRestore"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp">
+                    android:layout_alignParentStart="true"
+                    android:text="還原" />
 
-                    <!-- 左邊：還原 -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnRestore"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="還原"
-                        android:textColor="#000000"
-                        android:textStyle="bold"
-                        android:backgroundTint="#EDEDED"
-                        app:cornerRadius="12dp"
-                        android:paddingHorizontal="20dp"
-                        android:layout_alignParentStart="true" />
+                <!-- 右邊：刪除 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDelete"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="永久刪除"
+                    android:textColor="?attr/colorError" />
 
-                    <!-- 右邊：刪除 -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnDelete"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="刪除"
-                        android:textColor="#000000"
-                        android:textStyle="bold"
-                        android:backgroundTint="#EDEDED"
-                        app:cornerRadius="12dp"
-                        android:paddingHorizontal="20dp"
-                        android:layout_alignParentEnd="true" />
-
-                </RelativeLayout>
-
-
-            </LinearLayout>
+            </RelativeLayout>
         </LinearLayout>
-
-        <!-- 取消打勾/貼紙（垃圾桶不需要，直接隱藏） -->
-        <TextView
-            android:id="@+id/badgeLike"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/badgeNope"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone" />
-    </RelativeLayout>
+    </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

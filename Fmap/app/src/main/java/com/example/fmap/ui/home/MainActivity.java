@@ -1,4 +1,3 @@
-// 檔案路徑: C:/Users/rita9/Documents/Foodmap/Fmap/app/src/main/java/com/example/fmap/ui/home/MainActivity.java
 package com.example.fmap.ui.home;
 
 import android.annotation.SuppressLint;
@@ -168,14 +167,16 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
+
         if (id == R.id.action_trash) {
-            Fragment current = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-            if (current instanceof TrashFragment) {
-                getOnBackPressedDispatcher().onBackPressed();
+            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+
+            if (currentFragment instanceof TrashFragment) {
+                getSupportFragmentManager().popBackStack();
             } else {
                 getSupportFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, new TrashFragment())
-                        .addToBackStack(null)
+                        .addToBackStack("toggle_trash")
                         .commit();
             }
             return true;
@@ -185,6 +186,9 @@ public class MainActivity extends AppCompatActivity {
         }
         return super.onOptionsItemSelected(item);
     }
+
+
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -287,16 +291,29 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * 控制側邊抽屜(Drawer)和Toolbar的顯示樣式。
+     * @param enabled true: 顯示漢堡選單，啟用抽屜。false: 顯示返回箭頭，鎖定抽屜。
+     */
     public void setDrawerEnabled(boolean enabled) {
         if (drawerLayout == null || toggle == null) return;
+
+        // 根據 enabled 決定鎖定模式
         int lockMode = enabled ? DrawerLayout.LOCK_MODE_UNLOCKED : DrawerLayout.LOCK_MODE_LOCKED_CLOSED;
         drawerLayout.setDrawerLockMode(lockMode);
+
+        // 讓 ActionBarDrawerToggle 知道要顯示漢堡還是箭頭
         toggle.setDrawerIndicatorEnabled(enabled);
+
+        // 當顯示返回箭頭時，我們需要明確啟用它
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(!enabled);
         }
+
+        // 同步狀態，讓圖示立刻變化
         toggle.syncState();
     }
+
 
     private void setupChatFragment() {
         if (getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container) == null) {

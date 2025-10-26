@@ -1,36 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="horizontal" android:padding="12dp" android:background="#F2F2F7">
+<!-- 使用 MaterialCardView 作為根元素，打造 iOS 風格的圓角卡片 -->
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="@android:color/white">
 
-    <ImageView
-        android:id="@+id/imgThumb"
-        android:layout_width="72dp" android:layout_height="72dp"
-        android:scaleType="centerCrop"
-        android:background="@android:color/darker_gray" />
+    <!-- 用 ConstraintLayout 實現更靈活的內部排版 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp">
 
-    <LinearLayout
-        android:layout_width="0dp" android:layout_height="wrap_content"
-        android:layout_weight="1" android:orientation="vertical"
-        android:paddingStart="12dp" android:paddingEnd="12dp">
-        <TextView
-            android:id="@+id/tvName"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textSize="16sp" android:textStyle="bold"/>
-        <TextView
-            android:id="@+id/tvMeta"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textSize="13sp"/>
-        <TextView
-            android:id="@+id/tvTags"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textSize="12sp"/>
-    </LinearLayout>
+        <!-- 圓角圖片，使用 ShapeableImageView -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/imgThumb"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.SmallComponent"
+            tools:src="@tools:sample/backgrounds/scenic" />
 
-    <ImageButton
-        android:id="@+id/btnHeart"
-        android:layout_width="40dp" android:layout_height="40dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:src="@drawable/ic_favorite_filled"
-        android:contentDescription="@string/app_name"/>
-</LinearLayout>
+        <!-- 店家資訊區塊 -->
+        <LinearLayout
+            android:id="@+id/infoContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical"
+            app:layout_constraintEnd_toStartOf="@+id/btnHeart"
+            app:layout_constraintStart_toEndOf="@+id/imgThumb"
+            app:layout_constraintTop_toTopOf="@+id/imgThumb"
+            app:layout_constraintBottom_toBottomOf="@+id/imgThumb">
+
+            <!-- 店名：字體加粗，作為視覺焦點 -->
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/black"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="店名範例：一個很長很長的店家名稱" />
+
+            <!-- 次要資訊：例如評分或分類 -->
+            <TextView
+                android:id="@+id/tvMeta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="13sp"
+                android:textColor="#666666"
+                tools:text="4.5 ★・日式料理" />
+
+            <!-- 標籤：使用更淺的顏色 -->
+            <TextView
+                android:id="@+id/tvTags"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="12sp"
+                android:textColor="#888888"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="#可外帶 #有停車場 #深夜營業" />
+        </LinearLayout>
+
+        <!-- 心形按鈕：置於右側，垂直居中對齊 -->
+        <ImageButton
+            android:id="@+id/btnHeart"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/ic_favorite_filled"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:tint="@android:color/holo_red_light" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>

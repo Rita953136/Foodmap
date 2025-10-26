@@ -5,7 +5,6 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -15,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.example.fmap.R;
 import com.example.fmap.model.Place;
+import com.google.android.material.button.MaterialButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -72,7 +72,7 @@ public class TrashCardAdapter extends RecyclerView.Adapter<TrashCardAdapter.VH> 
     static class VH extends RecyclerView.ViewHolder {
         ImageView imgThumb, ivStar;
         TextView tvName, tvRating, tvTags;
-        ImageButton btnRestore;
+        MaterialButton btnRestore;
 
         private final OnTrashActionListener listener;
 
@@ -109,11 +109,23 @@ public class TrashCardAdapter extends RecyclerView.Adapter<TrashCardAdapter.VH> 
                 tvTags.setVisibility(View.GONE);
             }
 
+            // 【關鍵修改】套用你指定的健壯的圖片路徑處理邏輯
+            String imageUrl = p.getCoverImageFullPath();
+            if (imageUrl == null || imageUrl.trim().isEmpty()) {
+                String raw = p.getCoverImage();
+                if (raw != null && !raw.isEmpty() && !raw.startsWith("http") && !raw.startsWith("file:///")) {
+                    imageUrl = "file:///android_asset/" + raw;     // e.g. stores/xxx/cover.jpg
+                } else {
+                    imageUrl = raw; // 可能是 http(s) 或 null
+                }
+            }
+
+            // 使用處理過後的 imageUrl 來載入圖片
             Glide.with(ctx)
-                    .load(p.getCoverImage())
+                    .load(imageUrl)
                     .centerCrop()
-                    .placeholder(R.color.material_dynamic_neutral80)
-                    .error(R.color.material_dynamic_neutral80)
+                    .placeholder(R.color.material_dynamic_neutral90) // 使用一個較柔和的預載顏色
+                    .error(R.color.material_dynamic_neutral90)
                     .into(imgThumb);
 
             btnRestore.setOnClickListener(v -> {
