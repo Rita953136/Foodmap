@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.RatingBar;
 import android.widget.TextView;
 import android.graphics.Color;
 
@@ -85,9 +86,10 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        ImageView imgThumb, ivStar;
+        ImageView imgThumb;
         TextView tvName, tvRating, tvTags;
         TextView like, nope;
+        RatingBar ratingBar;
 
         private final OnPlaceClickListener listener;
 
@@ -95,7 +97,7 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
             super(v);
             this.listener = listener;
             imgThumb = v.findViewById(R.id.imgThumb);
-            ivStar = v.findViewById(R.id.ivStar);
+            ratingBar = v.findViewById(R.id.ratingBar);
             tvName = v.findViewById(R.id.tvName);
             tvRating = v.findViewById(R.id.tvRating);
             tvTags = v.findViewById(R.id.tvTags);
@@ -112,11 +114,16 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
             if (r != null && r > 0) {
                 tvRating.setText(String.format(Locale.getDefault(), "%.1f", r));
                 tvRating.setVisibility(View.VISIBLE);
-                if (ivStar != null) ivStar.setVisibility(View.VISIBLE);
+
+                if (ratingBar != null) {
+                    ratingBar.setRating(r.floatValue());
+                    ratingBar.setVisibility(View.VISIBLE);
+                }
             } else {
-                tvRating.setText("");
                 tvRating.setVisibility(View.GONE);
-                if (ivStar != null) ivStar.setVisibility(View.GONE);
+                if (ratingBar != null) {
+                    ratingBar.setVisibility(View.GONE);
+                }
             }
 
             // 標籤

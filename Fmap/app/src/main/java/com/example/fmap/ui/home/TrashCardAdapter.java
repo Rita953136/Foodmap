@@ -6,6 +6,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.RatingBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -70,7 +71,8 @@ public class TrashCardAdapter extends RecyclerView.Adapter<TrashCardAdapter.VH> 
     public int getItemCount() { return data.size(); }
 
     static class VH extends RecyclerView.ViewHolder {
-        ImageView imgThumb, ivStar;
+        ImageView imgThumb;
+        RatingBar ratingBar;
         TextView tvName, tvRating, tvTags;
         MaterialButton btnRestore;
 
@@ -80,7 +82,7 @@ public class TrashCardAdapter extends RecyclerView.Adapter<TrashCardAdapter.VH> 
             super(v);
             listener = l;
             imgThumb = v.findViewById(R.id.imgThumb);
-            ivStar   = v.findViewById(R.id.ivStar);
+            ratingBar = v.findViewById(R.id.ratingBar);
             tvName   = v.findViewById(R.id.tvName);
             tvRating = v.findViewById(R.id.tvRating);
             tvTags   = v.findViewById(R.id.tvTags);
@@ -94,11 +96,17 @@ public class TrashCardAdapter extends RecyclerView.Adapter<TrashCardAdapter.VH> 
             if (r != null && r > 0) {
                 tvRating.setText(String.format(Locale.getDefault(), "%.1f", r));
                 tvRating.setVisibility(View.VISIBLE);
-                if (ivStar != null) ivStar.setVisibility(View.VISIBLE);
+
+                if (ratingBar != null) {
+                    ratingBar.setRating(r.floatValue());
+                    ratingBar.setVisibility(View.VISIBLE);
+                }
             } else {
                 tvRating.setText("");
                 tvRating.setVisibility(View.GONE);
-                if (ivStar != null) ivStar.setVisibility(View.GONE);
+                if (ratingBar != null) {
+                    ratingBar.setVisibility(View.GONE);
+                }
             }
 
             List<String> tags = p.getTagsTop3();
@@ -109,22 +117,20 @@ public class TrashCardAdapter extends RecyclerView.Adapter<TrashCardAdapter.VH> 
                 tvTags.setVisibility(View.GONE);
             }
 
-            // 【關鍵修改】套用你指定的健壯的圖片路徑處理邏輯
             String imageUrl = p.getCoverImageFullPath();
             if (imageUrl == null || imageUrl.trim().isEmpty()) {
                 String raw = p.getCoverImage();
                 if (raw != null && !raw.isEmpty() && !raw.startsWith("http") && !raw.startsWith("file:///")) {
-                    imageUrl = "file:///android_asset/" + raw;     // e.g. stores/xxx/cover.jpg
+                    imageUrl = "file:///android_asset/" + raw;
                 } else {
-                    imageUrl = raw; // 可能是 http(s) 或 null
+                    imageUrl = raw;
                 }
             }
 
-            // 使用處理過後的 imageUrl 來載入圖片
             Glide.with(ctx)
                     .load(imageUrl)
                     .centerCrop()
-                    .placeholder(R.color.material_dynamic_neutral90) // 使用一個較柔和的預載顏色
+                    .placeholder(R.color.material_dynamic_neutral90)
                     .error(R.color.material_dynamic_neutral90)
                     .into(imgThumb);
 

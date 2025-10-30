@@ -84,11 +84,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
         mapFragment.getMapAsync(this);
 
-        // 回到我的位置按鈕
-        FloatingActionButton fab = view.findViewById(R.id.fab_my_location);
-        if (fab != null) {
-            fab.setOnClickListener(v -> enableMyLocationAndCenter());
-        }
     }
 
     @Override
@@ -148,5 +143,22 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 }
             });
         } catch (SecurityException ignored) { }
+    }
+    /** 進入頁面時讓 Drawer 漢堡變暗＆無法開啟 */
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setDrawerIconEnabled(false); // 🔹 變暗＋鎖定
+        }
+    }
+
+    /** 離開時恢復 Drawer */
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setDrawerIconEnabled(true);  // 🔹 恢復亮亮可點
+        }
     }
 }

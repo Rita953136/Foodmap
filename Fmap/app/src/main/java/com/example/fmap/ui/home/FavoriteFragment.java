@@ -43,13 +43,6 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
 
         setupRecyclerView();
     }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        loadFavorites();
-    }
-
     private void setupRecyclerView() {
         adapter = new FavoriteAdapter(requireContext(), this);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -88,6 +81,24 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
             }
 
             Toast.makeText(getContext(), "已取消收藏：" + place.getName(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    /** 進入頁面時讓 Drawer 漢堡變暗＆無法開啟 */
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setDrawerIconEnabled(false); // 🔹 變暗＋鎖定
+        }
+    }
+
+    /** 離開時恢復 Drawer */
+    @Override
+    public void onPause() {
+        super.onPause();
+        loadFavorites();
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setDrawerIconEnabled(true);  // 🔹 恢復亮亮可點
         }
     }
 }

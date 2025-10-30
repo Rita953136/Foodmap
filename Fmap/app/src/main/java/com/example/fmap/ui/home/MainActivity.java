@@ -49,18 +49,22 @@ public class MainActivity extends AppCompatActivity {
     private float dX, dY;
     private long lastTouchDown;
     private static final int CLICK_ACTION_THRESHOLD = ViewConfiguration.getTapTimeout();
+    private Toolbar toolbar;
 
     // === 發送到 ChatFragment 用的 debounce ===
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable tagsDebounceTask = null;
     private static final long TAGS_DEBOUNCE_MS = 250;
 
+    // 記錄目前多選標籤；關抽屜時一次送出
+    private List<String> latestSelectedTags = new ArrayList<>();
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
+        toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) getSupportActionBar().setDisplayShowTitleEnabled(false);
 
@@ -89,6 +93,21 @@ public class MainActivity extends AppCompatActivity {
         chatContainer = findViewById(R.id.chat_fragment_container);
         setupChatFragment();
         setupMovableFab();
+
+        // ★Drawer 關閉時，一次把完整標籤送給 ChatFragment
+        if (drawerLayout != null) {
+            drawerLayout.addDrawerListener(new DrawerLayout.DrawerListener() {
+                @Override public void onDrawerSlide(@NonNull View drawerView, float slideOffset) {}
+                @Override public void onDrawerOpened(@NonNull View drawerView) {}
+                @Override public void onDrawerClosed(@NonNull View drawerView) {
+                    Fragment f = getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container);
+                    if (f instanceof ChatFragment) {
+                        ((ChatFragment) f).applySelectedTags(new ArrayList<>(latestSelectedTags));
+                    }
+                }
+                @Override public void onDrawerStateChanged(int newState) {}
+            });
+        }
     }
 
     // ====== 懸浮按鈕可拖曳 + 開關聊天 ======
@@ -170,7 +189,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (id == R.id.action_trash) {
             Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-
             if (currentFragment instanceof TrashFragment) {
                 getSupportFragmentManager().popBackStack();
             } else {
@@ -186,9 +204,6 @@ public class MainActivity extends AppCompatActivity {
         }
         return super.onOptionsItemSelected(item);
     }
-
-
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -211,15 +226,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            // 1) 原本：通知 VM 做本地篩選
+            // 1) 通知 VM 做本地篩選
             homeVM.applyTagFilter(new ArrayList<>(selectedSet));
 
-            // 2) 同步到 ChatFragment（顯示附件小卡，支援叉叉回呼）
+            // 2) 更新最新多選結果，待抽屜關閉時送出
+            latestSelectedTags = new ArrayList<>(selectedSet);
+
+            // 3) 同步到 ChatFragment（更新可見小卡，支援叉叉回呼）
             Fragment f = getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container);
             if (f instanceof ChatFragment) {
                 ChatFragment cf = (ChatFragment) f;
 
-                // 設定（或覆蓋）一次回呼：WebView 點叉叉 → 取消對應 Chip
+                // WebView 點叉叉 → 取消對應 Chip
                 cf.setOnTagRemoveListener(tag -> {
                     ChipGroup g2 = findViewById(R.id.chip_group_tags);
                     if (g2 == null) return;
@@ -229,14 +247,14 @@ public class MainActivity extends AppCompatActivity {
                             Chip chip = (Chip) v2;
                             CharSequence tx = chip.getText();
                             if (tx != null && tx.toString().trim().equals(tag)) {
-                                chip.setChecked(false); // 會觸發本方法，再次同步 VM + WebView
+                                chip.setChecked(false);
                                 break;
                             }
                         }
                     }
                 });
 
-                // debounce 推送（避免 evaluateJavascript 太頻繁）
+                // debounce 推送 → 更新「可見標籤小卡」（不觸發 Agent）
                 if (tagsDebounceTask != null) handler.removeCallbacks(tagsDebounceTask);
                 final List<String> listForUi = new ArrayList<>(selectedSet);
                 tagsDebounceTask = () -> cf.updateVisibleTags(listForUi);
@@ -245,7 +263,8 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // 按一下 FAB 打開聊天時，同步一次目前已選標籤
+
+    // 打開聊天時，立刻同步一次目前標籤（顯示小卡）
     private void pushSelectedTagsToChatFragment() {
         ChipGroup chipGroup = findViewById(R.id.chip_group_tags);
         if (chipGroup == null) return;
@@ -265,6 +284,36 @@ public class MainActivity extends AppCompatActivity {
         Fragment f = getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container);
         if (f instanceof ChatFragment) {
             ((ChatFragment) f).updateVisibleTags(new ArrayList<>(selectedSet));
+        }
+    }
+
+    public void setDrawerIconEnabled(boolean enabled) {
+        if (enabled) {
+            // 開啟抽屜功能
+            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED);
+            toggle.setDrawerIndicatorEnabled(true);   // 恢復 ActionBarDrawerToggle 的控制
+            toggle.syncState();
+
+            // 恢復亮度
+            if (toolbar.getNavigationIcon() != null)
+                toolbar.getNavigationIcon().setAlpha(255);
+
+            // 點擊可以打開 Drawer
+            toolbar.setNavigationOnClickListener(v ->
+                    drawerLayout.openDrawer(GravityCompat.START));
+
+        } else {
+            // 關閉抽屜功能
+            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+            toggle.setDrawerIndicatorEnabled(false); // 暫時停用 toggle
+
+            // 手動放上同樣的漢堡圖示（灰掉）
+            toolbar.setNavigationIcon(toggle.getDrawerArrowDrawable()); // 換成你的漢堡 icon 檔
+            if (toolbar.getNavigationIcon() != null)
+                toolbar.getNavigationIcon().setAlpha(80); // 變暗 (0~255)
+
+            // 取消點擊
+            toolbar.setNavigationOnClickListener(null);
         }
     }
 
@@ -291,29 +340,16 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * 控制側邊抽屜(Drawer)和Toolbar的顯示樣式。
-     * @param enabled true: 顯示漢堡選單，啟用抽屜。false: 顯示返回箭頭，鎖定抽屜。
-     */
     public void setDrawerEnabled(boolean enabled) {
         if (drawerLayout == null || toggle == null) return;
-
-        // 根據 enabled 決定鎖定模式
         int lockMode = enabled ? DrawerLayout.LOCK_MODE_UNLOCKED : DrawerLayout.LOCK_MODE_LOCKED_CLOSED;
         drawerLayout.setDrawerLockMode(lockMode);
-
-        // 讓 ActionBarDrawerToggle 知道要顯示漢堡還是箭頭
         toggle.setDrawerIndicatorEnabled(enabled);
-
-        // 當顯示返回箭頭時，我們需要明確啟用它
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(!enabled);
         }
-
-        // 同步狀態，讓圖示立刻變化
         toggle.syncState();
     }
-
 
     private void setupChatFragment() {
         if (getSupportFragmentManager().findFragmentById(R.id.chat_fragment_container) == null) {

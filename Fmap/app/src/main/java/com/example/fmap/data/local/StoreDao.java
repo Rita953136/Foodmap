@@ -1,47 +1,55 @@
 package com.example.fmap.data.local;
 
-import androidx.lifecycle.LiveData;
-import androidx.room.Dao;
-import androidx.room.Insert;
+import androidx.room.Dao;import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
-
-import com.example.fmap.data.local.StoreEntity;
 
 import java.util.List;
 
 /**
- * Data Access Object (DAO) for the stores table.
- * 定義所有與 "stores" 表格互動的方法。
+ * Data Access Object
+ * @Dao 標籤：資料庫管家介面
  */
-@Dao // 告訴 Room 這是個 DAO 介面
+@Dao
 public interface StoreDao {
 
     /**
-     * 插入多家店。如果店家已存在（根據主鍵 id），就取代它們。
+     * 新增一整批店家資料
+     * @Insert 標籤： 新增，
+     *
+     * onConflict = OnConflictStrategy.REPLACE：如果店家已經存在 (ID 相同)，就用新的資料蓋掉舊的。
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertAll(List<StoreEntity> stores);
 
     /**
-     * 計算資料庫中有多少筆資料。
+     * 計算資料庫裡總共有幾家店。
+     * @Query 標籤：查詢
      */
     @Query("SELECT COUNT(*) FROM stores")
     int count();
 
     /**
-     *【非 LiveData 版本】進階搜尋店家。
-     * 這個方法會直接回傳一個 List，用來取代 observeForever 的用法。
+     * 這個方法會直接執行搜尋，然後立刻回傳一個 List<StoreEntity> 結果。
+     * 適合用在不需要即時更新畫面的地方。
+     *
+     * @param keyword  搜尋關鍵字 (店名或地址)
+     * @param category 分類關鍵字 (日式、火鍋...)
+     * @param catCount 分類數量 (如果為 0，就忽略分類條件)
+     * @param dishLike 喜歡的菜色關鍵字
+     * @param priceEq  價位關鍵字
+     * @return 符合所有條件的店家清單。
      */
     @Query("SELECT * FROM stores WHERE " +
-            "(:keyword = '' OR store_name LIKE '%' || :keyword || '%' OR address LIKE '%' || :keyword || '%') AND " + // "name" -> "store_name"
-            "(:catCount = 0 OR category LIKE '%' || :category || '%') AND " + //  修正 category 的比對方式
-            "(:dishLike = '' OR menuItems LIKE '%' || :dishLike || '%') AND " + // "dishLike" 是參數名, "menuItems" 是欄位名, 這部分正確
-            "(:priceEq = '' OR price_range LIKE '%' || :priceEq || '%')") // "price_level" -> "price_range"
+            "(:keyword = '' OR store_name LIKE '%' || :keyword || '%' OR address LIKE '%' || :keyword || '%') AND " +
+            "(:catCount = 0 OR category LIKE '%' || :category || '%') AND " +
+            "(:dishLike = '' OR menuItems LIKE '%' || :dishLike || '%') AND " +
+            "(:priceEq = '' OR price_range LIKE '%' || :priceEq || '%')")
     List<StoreEntity> searchAdvancedBlocking(String keyword, String category, int catCount, String dishLike, String priceEq);
 
     /**
-     *【非 LiveData 版本】根據 ID 列表，查詢多家店的資料。
+     * 用 ID 列表查詢多家店。
+     * 你給它一個 ID 清單 (例如 ["id1", "id2"])，它會回傳這些店家的完整資料。
      */
     @Query("SELECT * FROM stores WHERE id IN (:ids)")
     List<StoreEntity> getByIdsBlocking(List<String> ids);

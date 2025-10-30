@@ -1,42 +1,44 @@
-
 package com.example.fmap.model;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map; // 確保 import 了 Map
+import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 準備顯示在 App 畫面的「店家模型」(UI Model)。
+ * implements Serializable: 讓這個物件可以被序列化，方便在不同 Activity 或 Fragment 之間傳遞。
+ */
 public class Place implements Serializable {
 
-    // ---- 基本資料 ----
-    public String id;
-    private String name;
-    private String address;
-    private Double rating;
-    private Integer ratingCount;
+    // --- 基本資料，會對應到 UI 上的各個 TextView 或 RatingBar ---
+    public String id;          // 唯一ID
+    private String name;       // 店名
+    private String address;    // 地址
+    private Double rating;     // 評分 (例如 4.6)
 
-    // ---- 標籤與分類 ----
-    private List<String> tagsTop3;
-    private String priceRange;
+    // --- 標籤與價位 ---
+    private List<String> tagsTop3; // 顯示用的標籤
+    private String priceRange;     // 價位區間的文字 (例如 "$200–$400")
 
-    // ---- 其他屬性 ----
-    private Double lat;
-    private Double lng;
-    private String phone;
-    private String phoneDisplay;
-    private String coverImage;
-    private List<String> menuItems;
+    // --- 地圖與聯絡資訊 ---
+    private Double lat;            // 緯度
+    private Double lng;            // 經度
+    private String phone;          // 原始電話號碼 (可能用於撥號)
+    private String phoneDisplay;   // 顯示用的電話號碼 (格式化過的)
+    private String coverImage;     // 封面圖網址或路徑
+    private List<String> menuItems;// 推薦菜單
 
-    // ---- 營業時間 ----
+    // --- 營業時間 (結構較複雜) ---
     private Map<String, List<TimeRange>> businessHours;
 
-    // ---- 建構子 ----
+    // --- 建構子 (Constructor) ---
+    // Room 或 Gson 等工具需要一個空的建構子來建立物件
     public Place() {}
 
-    // ... 其他建構子 ...
+    // --- Getter 和 Setter 方法 ---
+    // 這些公開的方法，讓其他程式碼可以安全地存取或修改這個物件的私有(private)屬性。
 
-    // ---- Getter / Setter ----
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
@@ -48,9 +50,6 @@ public class Place implements Serializable {
 
     public Double getRating() { return rating; }
     public void setRating(Double rating) { this.rating = rating; }
-
-    public Integer getRatingCount() { return ratingCount; }
-    public void setRatingCount(Integer ratingCount) { this.ratingCount = ratingCount; }
 
     public List<String> getTagsTop3() { return tagsTop3; }
     public void setTagsTop3(List<String> tagsTop3) { this.tagsTop3 = tagsTop3; }
@@ -67,13 +66,16 @@ public class Place implements Serializable {
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
 
-    // ✨ 2. 為 phoneDisplay 新增 getter 和 setter
     public String getPhoneDisplay() { return phoneDisplay; }
     public void setPhoneDisplay(String phoneDisplay) { this.phoneDisplay = phoneDisplay; }
 
     public String getCoverImage() { return coverImage; }
     public void setCoverImage(String coverImage) { this.coverImage = coverImage; }
 
+    /**
+     * 取得圖片的完整路徑。
+     * 如果圖片是內建的，會自動加上 "file:///android_asset/" 前綴。
+     */
     public String getCoverImageFullPath() {
         if (coverImage == null || coverImage.isEmpty()) return null;
         if (!coverImage.startsWith("http") && !coverImage.startsWith("file:///")) {
@@ -93,8 +95,13 @@ public class Place implements Serializable {
     public List<String> getMenuItems() { return menuItems; }
     public void setMenuItems(List<String> menuItems) { this.menuItems = menuItems; }
 
-    // ... 其他實用方法 ...
 
+    // --- 物件比對相關方法 ---
+
+    /**
+     * 覆寫 equals 方法，用來判斷兩個 Place 物件是否代表「同一家店」。
+     * 這裡的判斷標準是：只要 id 相同，就視為同一家店。
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -103,6 +110,10 @@ public class Place implements Serializable {
         return Objects.equals(id, place.id);
     }
 
+    /**
+     * 配合 equals，覆寫 hashCode 方法。
+     * 讓具有相同 id 的 Place 物件有相同的雜湊碼。
+     */
     @Override
     public int hashCode() {
         return Objects.hash(id);

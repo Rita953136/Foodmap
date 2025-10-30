@@ -53,11 +53,10 @@ public class HomeViewModel extends AndroidViewModel {
 
     private final SharedPreferences prefs;
     private final FavoritesStore favStore;
-    private final ExecutorService viewModelExecutor; // ✨ 使用新的名稱，避免與 Repository 的混淆
+    private final ExecutorService viewModelExecutor;
     private final OpenAIClient openAIClient;
     private final StoresRepository storeRepo;
 
-    // ✨✨✨【改造點 1：建構子】✨✨✨
     public HomeViewModel(@NonNull Application app) {
         super(app);
         prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -83,7 +82,6 @@ public class HomeViewModel extends AndroidViewModel {
     public LiveData<String> getError() { return error; }
     public LiveData<String> getEmptyMessage() { return emptyMessage; }
     public LiveData<List<String>> getSelectedTags() { return selectedTags; }
-    public LiveData<TagMatchMode> getTagMatchMode() { return tagMatchMode; }
     public LiveData<List<Place>> getDislikedPlaces() { return dislikedPlaces; }
     public LiveData<Boolean> getIsLoadingTrash() { return isLoadingTrash; }
     public LiveData<String> getTrashError() { return trashError; }

@@ -1,30 +1,35 @@
 package com.example.fmap.data.local;
 
-import androidx.room.TypeConverter;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import androidx.room.TypeConverter; // 引入 Room 的「翻譯官」標籤
+import com.google.gson.Gson; // 引入 Google 的 JSON 翻譯工具
+import com.google.gson.reflect.TypeToken; // 輔助工具，用來處理 List<T> 這種複雜類型
 import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Room 的型別轉換器。
- * 讓 Room 能夠儲存和讀取它原本不支援的複雜型別，例如 List<String> 或 Map。
- * 原理是將物件用 Gson 轉換成 JSON 字串來儲存，讀取時再反向轉換回來。
+ * Type Converters
+ * 讓 Room 能儲存它看不懂的複雜資料 (如 List 或 Map)
+ * 原理：存入時變文字 (JSON)，取出時變回物件
  */
 public class Converters {
     private static final Gson gson = new Gson();
 
-    // --- List<String> 的轉換器 ---
+    //  List<String>
+    /**
+     * @TypeConverter 標籤：告訴 Room 這是「存入」時要用的翻譯方法
+     * 把 List 物件翻譯成純文字
+     */
     @TypeConverter
     public static String fromStringList(List<String> list) {
-        if (list == null) {
-            return null;
-        }
-        return gson.toJson(list);
+        return list == null ? null : gson.toJson(list);
     }
 
+    /**
+     * @TypeConverter 標籤：告訴 Room 這是「讀取」時要用的翻譯方法
+     * 把純文字翻譯回 List 物件
+     */
     @TypeConverter
     public static List<String> toStringList(String json) {
         if (json == null) {
@@ -34,15 +39,19 @@ public class Converters {
         return gson.fromJson(json, listType);
     }
 
-    // --- Map<String, Object> 的轉換器 (用來儲存 business_hours, price_range 等) ---
+    // Map<String, Object>
+
+    /**
+     * 「存入」時用：把 Map 物件翻譯成純文字
+     */
     @TypeConverter
     public static String fromMap(Map<String, Object> map) {
-        if (map == null) {
-            return null;
-        }
-        return gson.toJson(map);
+        return map == null ? null : gson.toJson(map);
     }
 
+    /**
+     * 「讀取」時用：把純文字翻譯回 Map 物件
+     */
     @TypeConverter
     public static Map<String, Object> toMap(String json) {
         if (json == null) {

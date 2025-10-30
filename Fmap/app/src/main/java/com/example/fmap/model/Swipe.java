@@ -1,41 +1,49 @@
 package com.example.fmap.model;
 
 import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.ItemTouchHelper; // 引入 RecyclerView 的滑動觸控輔助工具
 
 /**
- * 卡片滑動動作模型。
- * - 右滑：LIKE
- * - 左滑：NOPE
- *
- * 可搭配你的 SwipeCallback / ItemTouchHelper 使用：
- *   Swipe.Action action = Swipe.fromDirection(direction);
- *   viewModel.handleSwipeAction(action, place);
+ * 卡片滑動動作的資料模型。
+ * 專門用來把 ItemTouchHelper 的「方向」轉換成好理解的「動作」。
  */
 public final class Swipe {
 
+    /**
+     * private 建構子，代表這是一個「工具類」，不應該被 new 出來。
+     * 所有的功能都應該透過靜態方法 (static) 來呼叫。
+     */
     private Swipe() {}
 
-    /** 對外使用的動作種類（HomeViewModel 依此判斷收藏/丟垃圾桶） */
+    /**
+     * 定義滑動的動作種類 (列舉 Enum)。
+     * 這樣 ViewModel 就可以清楚地判斷使用者是執行了哪個動作。
+     */
     public enum Action {
-        LIKE,   // 右滑
-        NOPE    // 左滑
+        LIKE,   // 代表「喜歡」，通常對應到右滑
+        NOPE    // 代表「不喜歡」，通常對應到左滑
     }
 
     /**
-     * 依據 ItemTouchHelper 的方向回傳對應動作：
-     * - RIGHT -> LIKE
-     * - LEFT  -> NOPE
-     * 其他方向預設回傳 NOPE（也可以改成丟 IllegalArgumentException）
+     * 工具方法：把 ItemTouchHelper 回傳的「方向數字」轉換成我們定義的 Action。
+     * @param itemTouchHelperDir ItemTouchHelper.Callback 的 onSwiped 方法傳過來的方向值。
+     * @return 回傳對應的 Action (LIKE 或 NOPE)。
      */
     @NonNull
     public static Action fromDirection(int itemTouchHelperDir) {
+        // 使用位元運算 (&) 來檢查方向。
+        // 這種寫法比 `==` 更安全，因為方向值可能是複合的。
+
+        // 如果方向包含了「往右」
         if ((itemTouchHelperDir & ItemTouchHelper.RIGHT) == ItemTouchHelper.RIGHT) {
-            return Action.LIKE;
-        } else if ((itemTouchHelperDir & ItemTouchHelper.LEFT) == ItemTouchHelper.LEFT) {
-            return Action.NOPE;
+            return Action.LIKE; // 就回傳 LIKE
         }
-        // 其它方向（UP/DOWN）視需求自行擴充；這裡先當作 NOPE。
+        // 如果方向包含了「往左」
+        else if ((itemTouchHelperDir & ItemTouchHelper.LEFT) == ItemTouchHelper.LEFT) {
+            return Action.NOPE; // 就回傳 NOPE
+        }
+
+        // 其他所有方向 (例如上、下)，都預設當作不喜歡。
         return Action.NOPE;
     }
 }

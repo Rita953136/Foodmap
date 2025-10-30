@@ -1,132 +1,148 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="8dp"
     android:layout_marginHorizontal="8dp"
-    android:background="@android:color/transparent"
+    android:layout_marginVertical="8dp"
     app:cardBackgroundColor="@android:color/white"
     app:cardCornerRadius="20dp"
     app:cardElevation="6dp"
-    app:cardUseCompatPadding="false"
     app:cardPreventCornerOverlap="true"
     app:strokeWidth="0dp">
 
-    <RelativeLayout
+    <!-- 使用 ConstraintLayout 作為根佈局，讓所有元件平鋪 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- 上半：圖片 -->
+        <!-- 1. 圖片 -->
         <ImageView
             android:id="@+id/imgThumb"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="230dp"
+            android:background="#EDEDED"
             android:scaleType="centerCrop"
-            android:background="#EDEDED" />
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- 下半：文字區（白底） -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        <!-- 2. 文字區的白色背景 -->
+        <!-- 我們只為文字區塊建立一個獨立的背景，而不是讓整個 LinearLayout 帶背景 -->
+        <View
+            android:id="@+id/text_area_background"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@android:color/white"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/imgThumb" />
+
+        <!-- 3. 店名 -->
+        <TextView
+            android:id="@+id/tvName"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_below="@id/imgThumb"
-            android:orientation="vertical"
-            android:paddingLeft="12dp"
-            android:paddingTop="12dp"
-            android:paddingRight="12dp"
-            android:paddingBottom="14dp"
-            android:background="@android:color/white">
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@android:color/black"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@+id/ratingRow"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/imgThumb"
+            tools:text="這是一間超級無敵長的店名" />
 
-            <!-- 第一行：店名 + 評分 -->
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+        <!-- 4. 評分區 -->
+        <LinearLayout
+            android:id="@+id/ratingRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="@id/tvName"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/tvName">
 
-                <TextView
-                    android:id="@+id/tvName"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintEnd_toStartOf="@+id/ratingRow"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent" />
-
-                <LinearLayout
-                    android:id="@+id/ratingRow"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent">
-
-                    <ImageView
-                        android:id="@+id/ivStar"
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@android:drawable/btn_star_big_on"
-                        app:tint="#FFC107" />
-
-                    <TextView
-                        android:id="@+id/tvRating"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </androidx.constraintlayout.widget.ConstraintLayout>
-
-            <!-- 第二行：標籤 -->
-            <TextView
-                android:id="@+id/tvTags"
-                android:layout_width="match_parent"
+            <RatingBar
+                android:id="@+id/ratingBar"
+                style="?attr/ratingBarStyleSmall"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textSize="13sp"
-                android:textColor="#555555"
-                android:fontFamily="sans-serif-medium" />
+                android:isIndicator="true"
+                android:numStars="5"
+                android:stepSize="0.1"
+                android:theme="@style/RatingBar"
+                tools:rating="4.6" />
+
+            <TextView
+                android:id="@+id/tvRating"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textAppearance="?attr/textAppearanceLabelMedium"
+                tools:text="4.6" />
         </LinearLayout>
 
-        <!-- 貼紙 -->
+        <!-- 5. 標籤 -->
+        <TextView
+            android:id="@+id/tvTags"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="14dp"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:textColor="#555555"
+            android:textSize="13sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="@id/ratingRow"
+            app:layout_constraintStart_toStartOf="@id/tvName"
+            app:layout_constraintTop_toBottomOf="@id/tvName"
+            tools:text="#標籤一 #標籤二 #標籤三" />
+
+        <!-- 6. 喜歡貼紙 (現在它和圖片位於同一個層級，不會被蓋住) -->
         <TextView
             android:id="@+id/badgeLike"
             android:layout_width="94dp"
             android:layout_height="69dp"
-            android:layout_alignParentTop="true"
-            android:layout_alignParentEnd="true"
-            android:layout_margin="12dp"
             android:layout_marginTop="60dp"
+            android:layout_marginEnd="12dp"
             android:alpha="0"
             android:background="#AA00C853"
-            android:padding="10dp"
+            android:gravity="center"
             android:text="LIKE"
             android:textColor="@android:color/white"
             android:textSize="30sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:alpha="0.8" />
 
+        <!-- 7. 不喜歡貼紙 -->
         <TextView
             android:id="@+id/badgeNope"
             android:layout_width="102dp"
             android:layout_height="68dp"
-            android:layout_alignParentStart="true"
-            android:layout_alignParentTop="true"
-            android:layout_margin="12dp"
+            android:layout_marginStart="12dp"
             android:layout_marginTop="60dp"
             android:alpha="0"
             android:background="#AAD50000"
-            android:padding="10dp"
+            android:gravity="center"
             android:text="NOPE"
             android:textColor="@android:color/white"
             android:textSize="30sp"
-            android:textStyle="bold" />
-    </RelativeLayout>
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:alpha="0.8" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

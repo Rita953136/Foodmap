@@ -5,27 +5,35 @@ import java.util.List;
 import java.util.Map;
 import com.google.gson.JsonElement;
 
-/** 對應 assets/stores_info_normalized.json 的資料模型 */
+/**
+ * 網路原始資料的模型 (Data Transfer Object, DTO)。
+ * 結構完全對應 assets/stores_info_normalized.json 的 JSON 格式。
+ */
 public class Store {
 
+    /**
+     * @SerializedName: 告訴 Gson，JSON 裡的 "store_name" 這個 key，
+     *                要對應到這個 'storeName' 變數。
+     */
     @SerializedName("store_name")
     private String storeName;
 
-    // JSON: ["西式","甜點",...]
+    @SerializedName("rating")
+    private Double rating;
+
+    // 對應 JSON 中的字串清單，例如 ["日式", "拉麵"]
     @SerializedName("category")
     private List<String> category;
 
-    // JSON: ["義式","披薩",...]
+    // 對應 JSON 中的字串清單，例如 ["可外帶", "寵物友善"]
     @SerializedName("tags")
     private List<String> tags;
 
+    // 對應 JSON 中的推薦菜單清單
     @SerializedName("menu_items")
     private List<String> menuItems;
 
-    @SerializedName("services")
-    private List<String> services;
-
-    // JSON: { "currency":"TWD","min":400,"max":800 }
+    // 對應 JSON 中的價位物件，例如 { "min": 200, "max": 400 }
     @SerializedName("price_range")
     private PriceRange priceRange;
 
@@ -33,59 +41,41 @@ public class Store {
 
     private String phone;
 
-    // JSON 裡是字串（裡面長得像物件，但實際就是字串），先當成 String 存
+    // 對應 JSON 中的 phone_display 欄位，用來顯示格式化過的電話號碼
     @SerializedName("phone_display")
     private String phoneDisplay;
 
-    // ★ 這是重點：JSON 是 { "星期一":[{open,close},...], "星期二":[...], ... }
+    // 對應 JSON 中的營業時間物件，結構是 {"星期一": [時段], "星期二": [時段], ...}
     @SerializedName("business_hours")
     private Map<String, List<TimeRange>> businessHours;
 
-    // 欄位內容是多個群組的字串陣列，這裡先整包吃成 Map<String, List<String>>
-    @SerializedName("extra_info")
-    private Map<String, List<String>> extraInfo;
-
-    // JSON: { "cover": "stores/.../cover.jpg", ... }
+    /**
+     * @SerializedName: 對應 JSON 中的 "images" 欄位。
+     * 使用 JsonElement 是因為這個欄位的格式不固定，可能是物件、陣列或字串，
+     * 讓 Gson 先把它當作一個通用的「JSON 元素」來讀取，後續再手動解析。
+     */
     @SerializedName("images")
     private JsonElement images;
 
-    public JsonElement getImages() { return images; }
-    public void setImages(JsonElement images) { this.images = images; }
-
-
-    private String imagePath;
-
-    public String getImagePath() {
-        return imagePath;
-    }
-
-    public void setImagePath(String imagePath) {
-        this.imagePath = imagePath;
-    }
-
-
-    // 如果你的 JSON 沒提供就會是 null，沒差
+    // 如果 JSON 沒提供經緯度，這些欄位會是 null
     private Double lat;
     private Double lng;
 
-    // ---- getters / setters ----
+    // ---- Getters 和 Setters ----
+    // 提供外部程式碼安全存取內部私有(private)屬性的管道。
+
     public String getStoreName() { return storeName; }
-    public void setStoreName(String storeName) { this.storeName = storeName; }
+
+    public Double getRating() { return rating;  }
 
     public List<String> getCategory() { return category; }
-    public void setCategory(List<String> category) { this.category = category; }
 
     public List<String> getTags() { return tags; }
     public void setTags(List<String> tags) { this.tags = tags; }
 
     public List<String> getMenuItems() { return menuItems; }
-    public void setMenuItems(List<String> menuItems) { this.menuItems = menuItems; }
-
-    public List<String> getServices() { return services; }
-    public void setServices(List<String> services) { this.services = services; }
 
     public PriceRange getPriceRange() { return priceRange; }
-    public void setPriceRange(PriceRange priceRange) { this.priceRange = priceRange; }
 
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
@@ -97,91 +87,19 @@ public class Store {
     public void setPhoneDisplay(String phoneDisplay) { this.phoneDisplay = phoneDisplay; }
 
     public Map<String, List<TimeRange>> getBusinessHours() { return businessHours; }
-    public void setBusinessHours(Map<String, List<TimeRange>> businessHours) { this.businessHours = businessHours; }
 
-    public Map<String, List<String>> getExtraInfo() { return extraInfo; }
-    public void setExtraInfo(Map<String, List<String>> extraInfo) { this.extraInfo = extraInfo; }
-    /** 取得 JSON 原始封面路徑（優先 imagePath，其次 images.cover），例如：stores/xxx/cover.jpg 或 https://... */
-    /** 取得 JSON 原始封面路徑（優先 imagePath，其次 images 內可能的 cover/generic 值） */
-    public String getCoverPathRaw() {
-        // 1) 若 imagePath 有值就用它
-        if (imagePath != null && !imagePath.trim().isEmpty()) {
-            return imagePath.trim();
-        }
+    public JsonElement getImages() { return images; }
 
-        // 2) 沒有 imagePath，檢查 images 欄位
-        if (images == null) return null;
-
-        try {
-            // 2-1) images 是物件：可能有 cover 或 gallery
-            if (images.isJsonObject()) {
-                var obj = images.getAsJsonObject();
-
-                // cover
-                if (obj.has("cover") && !obj.get("cover").isJsonNull()) {
-                    String s = obj.get("cover").getAsString().trim();
-                    if (!s.isEmpty()) return s;
-                }
-                // gallery: 取第一張
-                if (obj.has("gallery") && obj.get("gallery").isJsonArray()) {
-                    var arr = obj.get("gallery").getAsJsonArray();
-                    if (arr.size() > 0 && arr.get(0).isJsonPrimitive()) {
-                        String s = arr.get(0).getAsString().trim();
-                        if (!s.isEmpty()) return s;
-                    }
-                }
-            }
-
-            // 2-2) images 是陣列：可能直接是 ["stores/.../cover.jpg", ...]
-            if (images.isJsonArray()) {
-                var arr = images.getAsJsonArray();
-                for (var el : arr) {
-                    if (el != null && el.isJsonPrimitive()) {
-                        String s = el.getAsString().trim();
-                        if (!s.isEmpty()) return s;
-                    }
-                    // 或者是陣列元素是物件 { "cover": "..." }
-                    if (el != null && el.isJsonObject()) {
-                        var obj = el.getAsJsonObject();
-                        if (obj.has("cover") && !obj.get("cover").isJsonNull()) {
-                            String s = obj.get("cover").getAsString().trim();
-                            if (!s.isEmpty()) return s;
-                        }
-                    }
-                }
-            }
-
-            // 2-3) images 竟然是字串（也支援）
-            if (images.isJsonPrimitive()) {
-                String s = images.getAsString().trim();
-                if (!s.isEmpty()) return s;
-            }
-        } catch (Exception ignore) {
-            // 解析失敗就當沒圖
-        }
-        return null;
-    }
-
-
-    /** 取得可直接給 Glide 使用的完整路徑：
-     *  - 若是 assets 相對路徑 → 自動補 "file:///android_asset/"
-     *  - 若已是 http(s) 或 file:/// → 原樣回傳
-     */
-    public String getCoverAssetPath() {
-        String raw = getCoverPathRaw();
-        if (raw == null || raw.isEmpty()) return null;
-        if (raw.startsWith("http") || raw.startsWith("file:///")) return raw;
-        return "file:///android_asset/" + raw;
-    }
     public Double getLat() { return lat; }
-    public void setLat(Double lat) { this.lat = lat; }
 
     public Double getLng() { return lng; }
-    public void setLng(Double lng) { this.lng = lng; }
 
-    // 你的資料用店名當主鍵即可；若需要 id，可在載入時用店名做 slug
+    /**
+     * 取得這家店的唯一識別碼 (ID)。
+     * 這裡的策略是：直接用店名取代空白後當作 ID。
+     * 如果未來 JSON 有提供真正的 id 欄位，只需修改這裡即可。
+     */
     public String getId() {
-        // 若後續你有真的 id 欄位，再改這裡
         return storeName != null ? storeName.replaceAll("\\s+", "_") : null;
     }
 }

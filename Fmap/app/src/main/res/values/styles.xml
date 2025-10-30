@@ -25,6 +25,11 @@
         <style name="BottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
             <item name="android:background">@android:color/transparent</item>
         </style>
-
+    <style name="RatingBar" parent="Theme.AppCompat">
+        <!-- 亮起的星星顏色 -->
+        <item name="colorControlActivated">#FFC107</item> <!-- 這是橘黃色 -->
+        <!-- 未亮起的星星顏色 -->
+        <item name="colorControlNormal">#BDBDBD</item>    <!-- 這是灰色 -->
+    </style>
 
 </resources>

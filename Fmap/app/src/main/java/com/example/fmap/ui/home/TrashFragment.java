@@ -29,9 +29,11 @@ public class TrashFragment extends Fragment implements TrashCardAdapter.OnTrashA
 
     private TrashCardAdapter adapter;
     private HomeViewModel viewModel;
+
     public static TrashFragment newInstance() {
         return new TrashFragment();
     }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -43,44 +45,39 @@ public class TrashFragment extends Fragment implements TrashCardAdapter.OnTrashA
         super.onViewCreated(v, savedInstanceState);
         rvTrash  = v.findViewById(R.id.rvTrash);
         tvEmpty  = v.findViewById(R.id.tvEmptyTrash);
-        progress = findProgressBar(v); // ← 容錯尋找
+        progress = findProgressBar(v); // 容錯尋找
 
         adapter = new TrashCardAdapter(requireContext(), this);
         rvTrash.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvTrash.setAdapter(adapter);
 
         viewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
-
         observeViewModel();
+
         viewModel.loadDislikedPlacesFromPrefs(); // 載入一次
     }
 
-    /** 依序嘗試常見 id，找不到回傳 null */
-    /** 依序嘗試常見 id（不直接引用 R.id，避免編譯期紅字） */
+    /** 嘗試找 ProgressBar（容錯） */
     private @Nullable ProgressBar findProgressBar(@NonNull View root) {
-        // 1) 先試專案常用的 loading_indicator（若 layout 有的話）
         ProgressBar pb = root.findViewById(R.id.loading_indicator);
         if (pb != null) return pb;
 
-        // 2) 以名稱動態尋找 progressTrash
         int id = getResources().getIdentifier("progressTrash", "id", requireContext().getPackageName());
         if (id != 0) {
             pb = root.findViewById(id);
             if (pb != null) return pb;
         }
 
-        // 3) 以名稱動態尋找 progressBar
         id = getResources().getIdentifier("progressBar", "id", requireContext().getPackageName());
         if (id != 0) {
             pb = root.findViewById(id);
             if (pb != null) return pb;
         }
 
-        // 找不到就不顯示進度條
         return null;
     }
 
-
+    /** 監聽 VM 狀態 */
     private void observeViewModel() {
         viewModel.getIsLoadingTrash().observe(getViewLifecycleOwner(), loading -> {
             boolean show = loading != null && loading;
@@ -100,6 +97,7 @@ public class TrashFragment extends Fragment implements TrashCardAdapter.OnTrashA
         viewModel.getDislikedPlaces().observe(getViewLifecycleOwner(), this::renderList);
     }
 
+    /** 更新列表畫面 */
     private void renderList(List<Place> list) {
         adapter.submit(list);
         boolean has = list != null && !list.isEmpty();
@@ -107,24 +105,31 @@ public class TrashFragment extends Fragment implements TrashCardAdapter.OnTrashA
         tvEmpty.setVisibility(has ? View.GONE : View.VISIBLE);
     }
 
+    /** 還原一項 */
     @Override
     public void onRestore(@NonNull Place place, int position) {
         if (place.getId() == null) return;
-        // 1.只需要通知 ViewModel 處理業務邏輯
         viewModel.removeFromDislikes(place.getId());
-        // 2. 顯示一個提示，讓使用者知道操作已觸發
         Toast.makeText(getContext(),
                 "已還原：「" + (place.getName() != null ? place.getName() : "") + "」",
                 Toast.LENGTH_SHORT).show();
     }
 
+    /** 進入頁面時讓 Drawer 漢堡變暗＆無法開啟 */
     @Override
     public void onResume() {
         super.onResume();
         if (getActivity() instanceof MainActivity) {
-            ((MainActivity) getActivity()).setDrawerEnabled(true);
+            ((MainActivity) getActivity()).setDrawerIconEnabled(false); // 🔹 變暗＋鎖定
         }
     }
 
-
+    /** 離開時恢復 Drawer */
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setDrawerIconEnabled(true);  // 🔹 恢復亮亮可點
+        }
+    }
 }
