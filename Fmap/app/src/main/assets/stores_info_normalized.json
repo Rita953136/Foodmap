@@ -174,7 +174,9 @@
     "images": {
       "cover": "stores/bellini-pasta-pasta-台中大遠百店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1640592,
+    "lng": 120.6445579
   },
   {
     "store_name": "Black韓noodle",
@@ -333,7 +335,9 @@
     "images": {
       "cover": "stores/black韓noodle/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1843295,
+    "lng": 120.6454188
   },
   {
     "store_name": "Concept La'麵 KnockOut",
@@ -475,7 +479,9 @@
     "images": {
       "cover": "stores/concept-la-麵-knockout/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1524581,
+    "lng": 120.6582115
   },
   {
     "store_name": "JAI宅 義大利麵 一中店",
@@ -646,7 +652,9 @@
     "images": {
       "cover": "stores/jai宅-義大利麵-一中店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1488082,
+    "lng": 120.6833244
   },
   {
     "store_name": "Nagi豚骨拉麵 凪 - 台中店",
@@ -805,17 +813,17 @@
     "images": {
       "cover": "stores/nagi豚骨拉麵-凪-台中店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1642474,
+    "lng": 120.6381239
   },
   {
     "store_name": "燒肉スマイル（燒肉Smile）台中一中店",
     "rating": 4.8,
     "category": [
       "日式",
-      "燒肉",
-      "肉食",
-      "套餐",
-      "宵夜"
+      "烤物",
+      "飯類"
     ],
     "tags": [
       "燒肉",
@@ -994,17 +1002,17 @@
     "images": {
       "cover": "stores/燒肉スマイル-燒肉smile-台中一中店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1488908,
+    "lng": 120.6865082
   },
   {
     "store_name": "開丼 燒肉vs丼飯 台中LALAPort店",
     "rating": 4.5,
     "category": [
       "日式",
-      "燒肉",
-      "丼飯",
-      "定食",
-      "鐵板料理"
+      "飯類",
+      "其他"
     ],
     "tags": [
       "燒肉丼",
@@ -1127,7 +1135,9 @@
     "images": {
       "cover": "stores/開丼-燒肉vs丼飯-台中lalaport店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1357637,
+    "lng": 120.6925532
   },
   {
     "store_name": "靜岡勝政豬排 台中中友店",
@@ -1135,8 +1145,7 @@
     "category": [
       "日式",
       "炸物",
-      "豬排",
-      "定食",
+      "飯類",
       "甜點"
     ],
     "tags": [
@@ -1279,7 +1288,9 @@
     "images": {
       "cover": "stores/靜岡勝政豬排-台中中友店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1522173,
+    "lng": 120.684783
   },
   {
     "store_name": "勝博殿 台中新光三越店",
@@ -1287,9 +1298,8 @@
     "category": [
       "日式",
       "炸物",
-      "豬排",
-      "定食",
-      "便當"
+      "飯類",
+      "甜點"
     ],
     "tags": [
       "豬排",
@@ -1434,17 +1444,19 @@
     "images": {
       "cover": "stores/勝博殿-台中新光三越店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1647673,
+    "lng": 120.6434748
   },
   {
     "store_name": "久違石頭火鍋 逢甲店",
     "rating": 4.6,
     "category": [
       "火鍋",
-      "辣味",
-      "海鮮",
-      "牛肉",
-      "羊肉"
+      "小菜",
+      "甜點",
+      "清淡",
+      "飲品"
     ],
     "tags": [
       "石頭火鍋",
@@ -1606,7 +1618,9 @@
     "images": {
       "cover": "stores/久違石頭火鍋-逢甲店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1744199,
+    "lng": 120.6485236
   },
   {
     "store_name": "信兵衛手作丼飯壽司 大勇町二代目",
@@ -1786,7 +1800,9 @@
     "images": {
       "cover": "stores/信兵衛手作丼飯壽司-大勇町二代目/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1346038,
+    "lng": 120.6877748
   },
   {
     "store_name": "倫家排骨飯",
@@ -1907,17 +1923,18 @@
     "images": {
       "cover": "stores/倫家排骨飯/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1741643,
+    "lng": 120.6692968
   },
   {
     "store_name": "偷偷 TOUTOU",
     "rating": 4.2,
     "category": [
-      "咖啡廳",
+      "飲品",
       "甜點",
-      "法式料理",
-      "早午餐",
-      "輕食"
+      "清淡",
+      "西式"
     ],
     "tags": [
       "咖啡",
@@ -2038,17 +2055,19 @@
     "images": {
       "cover": "stores/偷偷-toutou/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.157329,
+    "lng": 120.65756
   },
   {
     "store_name": "力軒屋 丼飯食堂",
     "rating": 4.6,
     "category": [
-      "日式料理",
-      "丼飯",
-      "平價小吃",
-      "快餐",
-      "炸物"
+      "飯類",
+      "其他",
+      "日式",
+      "其他亞洲",
+      "飲品"
     ],
     "tags": [
       "牛丼",
@@ -2216,17 +2235,19 @@
     "images": {
       "cover": "stores/力軒屋-丼飯食堂/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1818226,
+    "lng": 120.6458568
   },
   {
     "store_name": "十二段鍋物堂 健行店",
     "rating": 4.9,
     "category": [
       "火鍋",
-      "鍋物料理",
-      "深夜食堂",
-      "高檔餐廳",
-      "聚餐首選"
+      "甜點",
+      "清淡",
+      "日式",
+      "飲品"
     ],
     "tags": [
       "壽喜燒",
@@ -2401,16 +2422,19 @@
     "images": {
       "cover": "stores/十二段鍋物堂-健行店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1564999,
+    "lng": 120.6634462
   },
   {
     "store_name": "霂聚牛肉麵",
     "rating": 4.9,
     "category": [
-      "中式料理",
-      "牛肉麵",
-      "小吃",
-      "平價餐館"
+      "小菜",
+      "清淡",
+      "台式",
+      "麵食",
+      "飲品"
     ],
     "tags": [
       "紅燒牛肉麵",
@@ -2560,7 +2584,9 @@
     "images": {
       "cover": "stores/霂聚牛肉麵/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1519804,
+    "lng": 120.6549279
   },
   {
     "store_name": "和牛涮 台中文心崇德店",
@@ -2735,17 +2761,16 @@
     "images": {
       "cover": "stores/和牛涮-台中文心崇德店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1724479,
+    "lng": 120.684973
   },
   {
     "store_name": "九宮酪（逢甲合作店）",
     "rating": 4.9,
     "category": [
-      "甜點店",
-      "塔類專賣",
-      "烘焙點心",
-      "夜市美食",
-      "外帶甜點"
+      "飲品",
+      "甜點"
     ],
     "tags": [
       "甜點",
@@ -2846,7 +2871,9 @@
     "images": {
       "cover": "stores/九宮酪-逢甲合作店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1797817,
+    "lng": 120.6457838
   },
   {
     "store_name": "亞丁尼義式麵屋 逢甲店",
@@ -3016,16 +3043,18 @@
     "images": {
       "cover": "stores/亞丁尼義式麵屋-逢甲店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1817889,
+    "lng": 120.6454169
   },
   {
     "store_name": "品豪鹽酥雞（青海店）",
     "rating": 4.6,
     "category": [
-      "台式",
+      "清淡",
       "炸物",
-      "宵夜",
-      "小吃"
+      "台式",
+      "西式"
     ],
     "tags": [
       "鹽酥雞",
@@ -3124,7 +3153,9 @@
     "images": {
       "cover": "stores/品豪鹽酥雞-青海店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1633043,
+    "lng": 120.6573024
   },
   {
     "store_name": "夏帕義大利麵 逢甲店",
@@ -3266,7 +3297,9 @@
     "images": {
       "cover": "stores/夏帕義大利麵-逢甲店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1794464,
+    "lng": 120.6466777
   },
   {
     "store_name": "大昌排骨飯便當",
@@ -3374,7 +3407,9 @@
     "images": {
       "cover": "stores/大昌排骨飯便當/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1733775,
+    "lng": 120.6444983
   },
   {
     "store_name": "好食雞炸物店（台中）",
@@ -3521,7 +3556,9 @@
     "images": {
       "cover": "stores/好食雞炸物店-台中/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1898202,
+    "lng": 120.6646771
   },
   {
     "store_name": "尊品原汁牛肉麵",
@@ -3676,7 +3713,9 @@
     "images": {
       "cover": "stores/尊品原汁牛肉麵/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.175971,
+    "lng": 120.644246
   },
   {
     "store_name": "川田屋",
@@ -3824,7 +3863,9 @@
     "images": {
       "cover": "stores/川田屋/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1810521,
+    "lng": 120.6461837
   },
   {
     "store_name": "御禾屋弁當專賣（甘肅店）",
@@ -3965,7 +4006,9 @@
     "images": {
       "cover": "stores/御禾屋弁當專賣-甘肅店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1682235,
+    "lng": 120.6574603
   },
   {
     "store_name": "拾飯 日式料理．丼飯．壽司．刺身",
@@ -4141,7 +4184,9 @@
     "images": {
       "cover": "stores/拾飯-日式料理-丼飯-壽司-刺身/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.177169,
+    "lng": 120.643476
   },
   {
     "store_name": "搭好義大利麵",
@@ -4279,15 +4324,19 @@
     "images": {
       "cover": "stores/搭好義大利麵/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1760921,
+    "lng": 120.663338
   },
   {
     "store_name": "擄胃專家",
     "rating": 4.2,
     "category": [
+      "飯類",
+      "其他",
+      "中式",
       "台式",
-      "便當",
-      "家庭料理"
+      "炸物"
     ],
     "tags": [
       "排骨飯",
@@ -4405,7 +4454,9 @@
     "images": {
       "cover": "stores/擄胃專家/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.180573,
+    "lng": 120.645477
   },
   {
     "store_name": "林立牛肉麵",
@@ -4537,7 +4588,9 @@
     "images": {
       "cover": "stores/林立牛肉麵/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1535216,
+    "lng": 120.6674033
   },
   {
     "store_name": "正韓食",
@@ -4689,15 +4742,19 @@
     "images": {
       "cover": "stores/正韓食/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1438781,
+    "lng": 120.6504244
   },
   {
     "store_name": "泰廣城泰式料理",
     "rating": 4.8,
     "category": [
+      "小菜",
+      "清淡",
       "泰式",
-      "東南亞料理",
-      "異國料理"
+      "飲品",
+      "炸物"
     ],
     "tags": [
       "泰式酸辣湯",
@@ -4851,7 +4908,9 @@
     "images": {
       "cover": "stores/泰廣城泰式料理/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1649254,
+    "lng": 120.6609799
   },
   {
     "store_name": "泰水泰式小吃餐廳",
@@ -5030,7 +5089,9 @@
     "images": {
       "cover": "stores/泰水泰式小吃餐廳/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1708506,
+    "lng": 120.6445482
   },
   {
     "store_name": "泰漾泰式簡餐",
@@ -5180,7 +5241,9 @@
     "images": {
       "cover": "stores/泰漾泰式簡餐/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1812976,
+    "lng": 120.6461333
   },
   {
     "store_name": "泰竹泰式料理",
@@ -5337,15 +5400,19 @@
     "images": {
       "cover": "stores/泰竹泰式料理/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1751623,
+    "lng": 120.6457289
   },
   {
     "store_name": "清一色牛肉麵 大墩店",
     "rating": 4.6,
     "category": [
-      "中式麵食",
-      "牛肉麵",
-      "台式料理"
+      "小菜",
+      "其他",
+      "台式",
+      "麵食",
+      "飲品"
     ],
     "tags": [
       "紅燒牛肉麵",
@@ -5444,7 +5511,9 @@
     "images": {
       "cover": "stores/清一色牛肉麵-大墩店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1595398,
+    "lng": 120.6528481
   },
   {
     "store_name": "炸綺來鹹酥雞-台中北屯店",
@@ -5571,7 +5640,9 @@
     "images": {
       "cover": "stores/炸綺來鹹酥雞-台中北屯店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1733862,
+    "lng": 120.6847718
   },
   {
     "store_name": "牛丁次郎坊x深夜裡的和魂燒肉丼x水湳經貿支店",
@@ -5702,15 +5773,20 @@
     "images": {
       "cover": "stores/牛丁次郎坊x深夜裡的和魂燒肉丼x水湳經貿支店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1905321,
+    "lng": 120.6610021
   },
   {
     "store_name": "牛庵",
     "rating": 4.5,
     "category": [
-      "日本料理",
-      "咖哩飯",
-      "拉麵"
+      "其他",
+      "清淡",
+      "日式",
+      "其他亞洲",
+      "麵食",
+      "炸物"
     ],
     "tags": [
       "牛骨白湯拉麵",
@@ -5811,7 +5887,9 @@
     "images": {
       "cover": "stores/牛庵/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1677369,
+    "lng": 120.6534425
   },
   {
     "store_name": "狂一鍋－台中漢口店",
@@ -5961,7 +6039,9 @@
     "images": {
       "cover": "stores/狂一鍋-台中漢口店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1665869,
+    "lng": 120.6641578
   },
   {
     "store_name": "玉膳堂牛肉麵 ︎手工水餃",
@@ -6083,16 +6163,19 @@
     "images": {
       "cover": "stores/玉膳堂牛肉麵-手工水餃/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1470918,
+    "lng": 120.6549092
   },
   {
     "store_name": "瑰覓 Gui Mi 逢甲店",
     "rating": 4.5,
     "category": [
-      "餐廳",
-      "早午餐",
-      "義大利麵",
-      "調酒"
+      "小菜",
+      "西式",
+      "麵食",
+      "飲品",
+      "炸物"
     ],
     "tags": [
       "奶油金沙蛤蠣干貝義大利麵",
@@ -6247,15 +6330,19 @@
     "images": {
       "cover": "stores/瑰覓-gui-mi-逢甲店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1824301,
+    "lng": 120.6461957
   },
   {
     "store_name": "知肉極緻韓燒肉－台中公益店",
     "rating": 4.9,
     "category": [
-      "韓式料理",
-      "燒烤",
-      "高級餐廳"
+      "小菜",
+      "甜點",
+      "烤物",
+      "韓式",
+      "飲品"
     ],
     "tags": [
       "韓式燒烤",
@@ -6419,7 +6506,9 @@
     "images": {
       "cover": "stores/知肉極緻韓燒肉-台中公益店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.151073,
+    "lng": 120.6536858
   },
   {
     "store_name": "福炸堂鹹酥雞（逢甲店）",
@@ -6551,7 +6640,9 @@
     "images": {
       "cover": "stores/福炸堂鹹酥雞-逢甲店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1724529,
+    "lng": 120.6458773
   },
   {
     "store_name": "窩巷甜點 Hidden Lane",
@@ -6654,7 +6745,9 @@
     "images": {
       "cover": "stores/窩巷甜點-hidden-lane/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1335479,
+    "lng": 120.664899
   },
   {
     "store_name": "窩巷甜點 Hidden Lane",
@@ -6758,7 +6851,9 @@
     "images": {
       "cover": "stores/窩巷甜點-hidden-lane/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1335479,
+    "lng": 120.664899
   },
   {
     "store_name": "米撰便當 台中西屯店",
@@ -6892,7 +6987,9 @@
     "images": {
       "cover": "stores/米撰便當-台中西屯店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.181655,
+    "lng": 120.6362372
   },
   {
     "store_name": "美味便當",
@@ -7034,15 +7131,17 @@
     "images": {
       "cover": "stores/美味便當/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.188886,
+    "lng": 120.662588
   },
   {
     "store_name": "耕者有其甜",
     "rating": 4.4,
     "category": [
+      "飲品",
       "甜點",
-      "咖啡廳",
-      "預訂制甜品"
+      "中式"
     ],
     "tags": [
       "戚風蛋糕",
@@ -7133,7 +7232,9 @@
     "images": {
       "cover": "stores/耕者有其甜/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1483572,
+    "lng": 120.659077
   },
   {
     "store_name": "聚 日式鍋物 台中公益店",
@@ -7276,7 +7377,9 @@
     "images": {
       "cover": "stores/聚-日式鍋物-台中公益店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1512788,
+    "lng": 120.6434426
   },
   {
     "store_name": "胖老爹美式炸雞-逢大河南店",
@@ -7465,15 +7568,18 @@
     "images": {
       "cover": "stores/胖老爹美式炸雞-逢大河南店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1758412,
+    "lng": 120.6510713
   },
   {
     "store_name": "菓洞甜點工作室 Dessert Hole Workshop",
     "rating": 4.7,
     "category": [
+      "飲品",
       "甜點",
-      "蛋糕",
-      "塔類"
+      "清淡",
+      "西式"
     ],
     "tags": [
       "乳酪蛋糕",
@@ -7599,15 +7705,19 @@
     "images": {
       "cover": "stores/菓洞甜點工作室-dessert-hole-workshop/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1847387,
+    "lng": 120.6644041
   },
   {
     "store_name": "衝丼一食",
     "rating": 4.7,
     "category": [
-      "日式料理",
-      "丼飯",
-      "定食"
+      "飯類",
+      "其他",
+      "港式",
+      "日式",
+      "炸物"
     ],
     "tags": [
       "炸豬排",
@@ -7776,7 +7886,9 @@
     "images": {
       "cover": "stores/衝丼一食/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1801228,
+    "lng": 120.6454503
   },
   {
     "store_name": "豫春園麵食館",
@@ -7932,7 +8044,9 @@
     "images": {
       "cover": "stores/豫春園麵食館/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1817922,
+    "lng": 120.6461125
   },
   {
     "store_name": "豬對有韓式烤肉吃到飽 台中逢甲店",
@@ -8122,7 +8236,9 @@
     "images": {
       "cover": "stores/豬對有韓式烤肉吃到飽-台中逢甲店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1824758,
+    "lng": 120.6442863
   },
   {
     "store_name": "輕井澤 公益店",
@@ -8329,7 +8445,9 @@
     "images": {
       "cover": "stores/輕井澤-公益店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1511883,
+    "lng": 120.6540975
   },
   {
     "store_name": "這一鍋 台中朝富殿",
@@ -8534,7 +8652,9 @@
     "images": {
       "cover": "stores/這一鍋-台中朝富殿/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1670683,
+    "lng": 120.6376604
   },
   {
     "store_name": "這都有炸物-總店",
@@ -8722,15 +8842,18 @@
     "images": {
       "cover": "stores/這都有炸物-總店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1758816,
+    "lng": 120.694621
   },
   {
     "store_name": "逢甲台灣真有味",
     "rating": 4.2,
     "category": [
+      "飲品",
       "炸物",
-      "台式小吃",
-      "宵夜"
+      "台式",
+      "西式"
     ],
     "tags": [
       "鹽酥雞",
@@ -8876,15 +8999,19 @@
     "images": {
       "cover": "stores/逢甲台灣真有味/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1810498,
+    "lng": 120.6459265
   },
   {
     "store_name": "小眷村牛肉麵（重慶店）",
     "rating": 4.5,
     "category": [
-      "牛肉麵",
-      "中式麵食",
-      "台式料理"
+      "小菜",
+      "清淡",
+      "中式",
+      "台式",
+      "麵食"
     ],
     "tags": [
       "川辣牛肉麵",
@@ -9117,7 +9244,9 @@
     "images": {
       "cover": "stores/小眷村牛肉麵-重慶店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1681481,
+    "lng": 120.6579527
   },
   {
     "store_name": "金韓食",
@@ -9306,15 +9435,19 @@
     "images": {
       "cover": "stores/金韓食/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1626076,
+    "lng": 120.6502954
   },
   {
     "store_name": "銀鉤韓式鍋物銅盤烤肉 逢甲店",
     "rating": 4.6,
     "category": [
-      "韓式料理",
       "火鍋",
-      "銅盤烤肉"
+      "小菜",
+      "烤物",
+      "韓式",
+      "飲品"
     ],
     "tags": [
       "韓式鍋物",
@@ -9470,7 +9603,9 @@
     "images": {
       "cover": "stores/銀鉤韓式鍋物銅盤烤肉-逢甲店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.182438,
+    "lng": 120.6444855
   },
   {
     "store_name": "長生塩人 台中",
@@ -9608,7 +9743,9 @@
     "images": {
       "cover": "stores/長生塩人-台中/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1678353,
+    "lng": 120.6413874
   },
   {
     "store_name": "青食義大利麵 ｜燉飯｜焗烤 ｜下午茶",
@@ -9838,7 +9975,9 @@
     "images": {
       "cover": "stores/青食義大利麵-燉飯-焗烤-下午茶/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1666919,
+    "lng": 120.6725524
   },
   {
     "store_name": "鰻鰻烤 台中韓式餐廳",
@@ -10008,7 +10147,9 @@
     "images": {
       "cover": "stores/鰻鰻烤-台中韓式餐廳/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1345144,
+    "lng": 120.6836715
   },
   {
     "store_name": "鶯越式泰式美食",
@@ -10200,7 +10341,9 @@
     "images": {
       "cover": "stores/鶯越式泰式美食/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1763776,
+    "lng": 120.6471018
   },
   {
     "store_name": "麵屋武藏 台中首店",
@@ -10374,14 +10517,19 @@
     "images": {
       "cover": "stores/麵屋武藏-台中首店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1832767,
+    "lng": 120.6158012
   },
   {
     "store_name": "曼谷皇朝泰式料理",
     "rating": 4.9,
     "category": [
-      "泰式料理",
-      "南洋風味餐廳"
+      "其他",
+      "清淡",
+      "中式",
+      "泰式",
+      "炸物"
     ],
     "tags": [
       "酸辣生蝦",
@@ -10535,7 +10683,9 @@
     "images": {
       "cover": "stores/曼谷皇朝泰式料理/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.1468849,
+    "lng": 120.6554522
   },
   {
     "store_name": "𡘙師傅便當 台中逢甲店",
@@ -10690,6 +10840,8 @@
     "images": {
       "cover": "stores/𡘙師傅便當-台中逢甲店/cover.jpg",
       "gallery": []
-    }
+    },
+    "lat": 24.178334,
+    "lng": 120.6419
   }
 ]

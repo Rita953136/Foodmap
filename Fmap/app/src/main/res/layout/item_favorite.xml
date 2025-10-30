@@ -63,7 +63,8 @@
                 android:layout_marginTop="4dp"
                 android:textSize="13sp"
                 android:textColor="#666666"
-                tools:text="4.5 ★・日式料理" />
+                android:maxLines="1"
+                android:ellipsize="end"/>
 
             <!-- 標籤：使用更淺的顏色 -->
             <TextView

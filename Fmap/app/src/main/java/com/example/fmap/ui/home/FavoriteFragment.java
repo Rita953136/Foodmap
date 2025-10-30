@@ -64,7 +64,6 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
     public void onItemClick(Place place) {
         if (getActivity() instanceof AppCompatActivity && place != null && place.getId() != null) {
             AppCompatActivity activity = (AppCompatActivity) getActivity();
-            // ✅ 帶入兩個參數：placeId + Place（作為查不到資料時的備援）
             PlaceDetailFragment detailFragment = PlaceDetailFragment.newInstance(place.getId(), place);
             detailFragment.show(activity.getSupportFragmentManager(), detailFragment.getTag());
         }
@@ -90,13 +89,13 @@ public class FavoriteFragment extends Fragment implements FavoriteAdapter.OnFavo
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setDrawerIconEnabled(false); // 🔹 變暗＋鎖定
         }
+        loadFavorites();
     }
 
     /** 離開時恢復 Drawer */
     @Override
     public void onPause() {
         super.onPause();
-        loadFavorites();
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setDrawerIconEnabled(true);  // 🔹 恢復亮亮可點
         }

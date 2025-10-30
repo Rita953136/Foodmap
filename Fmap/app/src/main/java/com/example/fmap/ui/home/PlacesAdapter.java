@@ -19,6 +19,8 @@ import com.example.fmap.R;
 import com.example.fmap.model.Place;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -39,8 +41,18 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
 
     public void submit(List<Place> list) {
         data.clear();
-        if (list != null) data.addAll(list);
-        notifyDataSetChanged();
+        if (list != null && !list.isEmpty()) {
+            Collections.sort(list, new Comparator<Place>() {
+                @Override
+                public int compare(Place p1, Place p2) {
+                    Double r1 = (p1 != null && p1.getRating() != null) ? p1.getRating() : 0.0;
+                    Double r2 = (p2 != null && p2.getRating() != null) ? p2.getRating() : 0.0;
+                    return Double.compare(r2, r1);
+                }
+            });
+            data.addAll(list); // 加入排序好的資料
+        }
+        notifyDataSetChanged(); // 通知畫面更新
     }
 
     public Place getItem(int pos) {

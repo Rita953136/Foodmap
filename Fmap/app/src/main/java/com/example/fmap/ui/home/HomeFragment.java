@@ -11,11 +11,13 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SearchView;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fmap.R;
 import com.example.fmap.model.Place;
@@ -23,16 +25,48 @@ import com.example.fmap.model.Swipe;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+
 public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClickListener {
     private static final String TAG = "HomeFragment";
 
-    private androidx.recyclerview.widget.RecyclerView rvCards;
+    private RecyclerView rvCards;
     private View emptyView;
     private TextView tvEmpty;
     private ProgressBar loadingIndicator;
     private PlacesAdapter adapter;
     private HomeViewModel homeViewModel;
     private ChipGroup chipGroupTags;
+    private SearchView searchView;
+
+    // Drawer
+    private DrawerLayout drawerLayout;
+    // 如果你的 Drawer 有多個，且只想在特定抽屜關閉時觸發，填上該 drawer view 的 id；否則設為 0
+    private static final int TARGET_DRAWER_VIEW_ID = 0; // 例如 R.id.nav_view，沒有就維持 0
+
+    private final DrawerLayout.DrawerListener drawerListener = new DrawerLayout.SimpleDrawerListener() {
+        @Override
+        public void onDrawerClosed(@NonNull View drawerView) {
+            // 若指定目標 drawer id，且這次關閉的不是它，則跳過
+            if (TARGET_DRAWER_VIEW_ID != 0 && drawerView.getId() != TARGET_DRAWER_VIEW_ID) {
+                return;
+            }
+            // 側邊欄關閉 → 套用目前 chips 勾選
+            List<String> selected = collectSelectedCategoriesFromChips();
+            if (!sameAsViewModel(selected)) {
+                Log.d(TAG, "DrawerClosed -> 套用類別: " + selected);
+                homeViewModel.applyTagFilter(selected);
+            } else {
+                Log.d(TAG, "DrawerClosed -> 類別未變更，略過 reload");
+            }
+        }
+    };
 
     @Nullable
     @Override
@@ -49,41 +83,43 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
         }
 
         homeViewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
-
-        // 純本機版不需要資料來源設定，直接使用
+        // 多標籤預設 ANY（店家只要命中其中一個）
         homeViewModel.setTagMatchMode(HomeViewModel.TagMatchMode.ANY);
 
-        initializeViews(v);
+        initViews(v);
+        ensureChipGroupMultiSelect();
         setupRecyclerView();
+        // 若你想「勾選當下就更新」可打開下一行；但依你的需求，我們改為「關閉側欄才更新」所以不綁即時更新
+        // bindChipImmediateUpdate();
+        setupSearchView();
         observeViewModel();
-        setupTagMultiSelect();
+
+        // 取得 DrawerLayout 並註冊監聽（假設 Activity 的 DrawerLayout id 為 drawer_layout）
+        drawerLayout = requireActivity().findViewById(R.id.drawer_layout);
+        if (drawerLayout != null) {
+            drawerLayout.addDrawerListener(drawerListener);
+        } else {
+            Log.w(TAG, "找不到 DrawerLayout (R.id.drawer_layout)，無法在關閉時套用類別。");
+        }
 
         if (homeViewModel.getPlaces().getValue() == null) {
             homeViewModel.loadPlaces();
         }
     }
 
-    private void setupTagMultiSelect() {
-        if (chipGroupTags == null) return;
-
-        chipGroupTags.setOnCheckedStateChangeListener((group, checkedIds) -> {
-            java.util.List<String> selected = new java.util.ArrayList<>();
-            for (int id : checkedIds) {
-                Chip chip = group.findViewById(id);
-                if (chip != null && chip.isChecked()) {
-                    selected.add(chip.getText().toString());
-                }
-            }
-            homeViewModel.applyTagFilter(selected);
-        });
-    }
-
-    private void initializeViews(@NonNull View view) {
+    private void initViews(@NonNull View view) {
         rvCards = view.findViewById(R.id.rvCards);
         emptyView = view.findViewById(R.id.emptyView);
         tvEmpty = view.findViewById(R.id.tvEmpty);
         loadingIndicator = view.findViewById(R.id.loading_indicator);
-        chipGroupTags = view.findViewById(R.id.chip_group_tags);
+        chipGroupTags = view.findViewById(R.id.chip_group_tags); // 直接對應你提供的 XML id
+        searchView = view.findViewById(R.id.search_view);
+    }
+
+    /** 保險：即便 XML 設了，仍強制一次多選 */
+    private void ensureChipGroupMultiSelect() {
+        if (chipGroupTags == null) return;
+        chipGroupTags.setSingleSelection(false);
     }
 
     private void setupRecyclerView() {
@@ -96,10 +132,9 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
                 new SwipeCallback(adapter, (swipeAction, pos) -> {
                     Place swipedPlace = adapter.getItem(pos);
                     if (swipedPlace == null) return;
-                    adapter.removeAt(pos);
                     homeViewModel.handleSwipeAction(swipeAction, swipedPlace);
 
-                    String name = swipedPlace.getName(); // ← 改用 getter
+                    String name = swipedPlace.getName();
                     if (swipeAction == Swipe.Action.LIKE) {
                         Toast.makeText(getContext(), "已收藏：" + name, Toast.LENGTH_SHORT).show();
                     } else {
@@ -110,30 +145,60 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
         itemTouchHelper.attachToRecyclerView(rvCards);
     }
 
+    /**
+     * （可選）若你同時也想在「勾選 chip 當下」就更新，打開 onViewCreated 裡的呼叫並保留此方法
+     * 目前依你的需求（關閉側欄才刷新），預設不啟用。
+     */
+    private void bindChipImmediateUpdate() {
+        if (chipGroupTags == null) return;
+        chipGroupTags.setOnCheckedStateChangeListener((group, checkedIds) -> {
+            List<String> selected = collectSelectedCategoriesFromChips();
+            Log.d(TAG, "UI -> 即時選取類別: " + selected);
+            homeViewModel.applyTagFilter(selected);
+        });
+    }
+
+    /** SearchView：即時同步關鍵字進 ViewModel */
+    private void setupSearchView() {
+        if (searchView == null) return;
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override public boolean onQueryTextSubmit(String query) {
+                homeViewModel.applySearchQuery(query);
+                searchView.clearFocus();
+                return true;
+            }
+            @Override public boolean onQueryTextChange(String newText) {
+                homeViewModel.applySearchQuery(newText);
+                return true;
+            }
+        });
+    }
+
+    /** LiveData observers：以 places 決定可見度；isLoading 只控轉圈圈 */
     private void observeViewModel() {
         homeViewModel.getSelectedTags().observe(getViewLifecycleOwner(), tags ->
-                Log.d(TAG, "標籤已更新，當前篩選條件: " + tags)
+                Log.d(TAG, "VM -> 標籤(類別)已更新: " + tags)
         );
 
         homeViewModel.getPlaces().observe(getViewLifecycleOwner(), places -> {
             if (places == null) return;
+
+            Log.d(TAG, "UI 接到 places 筆數=" + places.size());
             adapter.submit(places);
+            // 保險：即使 submit() 未用 DiffUtil，也確保刷新
+            adapter.notifyDataSetChanged();
+
             boolean hasItems = !places.isEmpty();
             rvCards.setVisibility(hasItems ? View.VISIBLE : View.GONE);
             emptyView.setVisibility(hasItems ? View.GONE : View.VISIBLE);
+
+            rvCards.bringToFront();
+            rvCards.invalidate();
         });
 
         homeViewModel.getIsLoading().observe(getViewLifecycleOwner(), isLoading -> {
             if (isLoading == null) return;
             loadingIndicator.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-            if (isLoading) {
-                rvCards.setVisibility(View.GONE);
-                emptyView.setVisibility(View.GONE);
-            } else {
-                boolean hasItems = adapter != null && adapter.getItemCount() > 0;
-                rvCards.setVisibility(hasItems ? View.VISIBLE : View.GONE);
-                emptyView.setVisibility(hasItems ? View.GONE : View.VISIBLE);
-            }
         });
 
         homeViewModel.getError().observe(getViewLifecycleOwner(), error -> {
@@ -149,6 +214,41 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
             }
         });
     }
+
+    /** 收集目前 ChipGroup 被勾選的文字（使用顯示字串本身） */
+    private List<String> collectSelectedCategoriesFromChips() {
+        List<String> selected = new ArrayList<>();
+        if (chipGroupTags == null) return selected;
+        for (int i = 0; i < chipGroupTags.getChildCount(); i++) {
+            View child = chipGroupTags.getChildAt(i);
+            if (child instanceof Chip) {
+                Chip c = (Chip) child;
+                if (c.isChecked()) selected.add(String.valueOf(c.getText()));
+            }
+        }
+        return selected;
+    }
+
+    /** 比對 UI 勾選與 ViewModel 既有選擇是否相同（忽略順序與大小寫/全半形） */
+    private boolean sameAsViewModel(List<String> uiSelected) {
+        List<String> vm = homeViewModel.getSelectedTags().getValue();
+        if (vm == null) vm = new ArrayList<>();
+        Set<String> a = new HashSet<>();
+        for (String s : uiSelected) a.add(norm(s));
+        Set<String> b = new HashSet<>();
+        for (String s : vm) b.add(norm(s));
+        return a.equals(b);
+    }
+
+    private static String norm(String s) {
+        if (s == null) return "";
+        String x = s.replace("\ufeff", "")
+                .replace("\u200b", "").replace("\u200c", "").replace("\u200d", "")
+                .trim();
+        x = Normalizer.normalize(x, Normalizer.Form.NFKC);
+        return x.toLowerCase(Locale.ROOT);
+    }
+
     @Override
     public void onResume() {
         super.onResume();
@@ -158,20 +258,19 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
     }
 
     @Override
-    public void onPlaceClick(Place place) {
-        PlaceDetailFragment f = PlaceDetailFragment.newInstance(
-                place.getId(),   // placeId
-                place            // 備援的 Place 物件
-        );
-        f.show(getParentFragmentManager(), "place_detail");
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (drawerLayout != null) {
+            drawerLayout.removeDrawerListener(drawerListener);
+        }
     }
 
-
-    private void showPlaceDetails(String placeId) {
-        if (getActivity() instanceof AppCompatActivity) {
-            PlaceDetailFragment detailFragment = PlaceDetailFragment.newInstance(placeId);
-            detailFragment.show(((AppCompatActivity) getActivity()).getSupportFragmentManager(),
-                    detailFragment.getTag());
-        }
+    @Override
+    public void onPlaceClick(Place place) {
+        PlaceDetailFragment f = PlaceDetailFragment.newInstance(
+                place.getId(),
+                place
+        );
+        f.show(getParentFragmentManager(), "place_detail");
     }
 }

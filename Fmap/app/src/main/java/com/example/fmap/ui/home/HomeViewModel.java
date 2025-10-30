@@ -19,14 +19,16 @@ import com.example.fmap.model.Place;
 import com.example.fmap.model.Swipe;
 import com.example.fmap.util.OpenAIClient;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 
 public class HomeViewModel extends AndroidViewModel {
 
@@ -34,15 +36,16 @@ public class HomeViewModel extends AndroidViewModel {
 
     public enum TagMatchMode { ANY, ALL }
 
-    // --- UI State LiveData (保持不變) ---
+    // --- UI State LiveData ---
     private final MutableLiveData<List<Place>> places = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private final MutableLiveData<String> emptyMessage = new MutableLiveData<>("點擊或滑動卡片來探索");
     private final MutableLiveData<List<String>> selectedTags = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<TagMatchMode> tagMatchMode = new MutableLiveData<>(TagMatchMode.ALL);
+    private final MutableLiveData<String> searchQuery = new MutableLiveData<>("");
 
-    // --- Trash（不喜歡） (保持不變) ---
+    // --- Trash（不喜歡） ---
     private final MutableLiveData<List<Place>> dislikedPlaces = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoadingTrash = new MutableLiveData<>(false);
     private final MutableLiveData<String> trashError = new MutableLiveData<>();
@@ -61,22 +64,21 @@ public class HomeViewModel extends AndroidViewModel {
         super(app);
         prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         favStore = FavoritesStore.getInstance(app.getApplicationContext());
-        viewModelExecutor = Executors.newSingleThreadExecutor(); // 初始化 ViewModel 自己的背景執行緒
+        viewModelExecutor = Executors.newSingleThreadExecutor();
         openAIClient = new OpenAIClient(BuildConfig.OPENAI_API_KEY);
 
-        // 初始化 Repository
         storeRepo = new StoresRepository(app);
         storeRepo.initFromAssets(app);
-        storeRepo.getDbReady().observeForever(ready -> { // observeForever 在此處相對安全，因為 ViewModel 會在 App 結束時才銷毀
+        storeRepo.getDbReady().observeForever(ready -> {
             if (Boolean.TRUE.equals(ready)) {
                 if (places.getValue() == null || places.getValue().isEmpty()) {
-                    loadPlaces(); // 當資料庫就緒，自動載入一次資料
+                    loadPlaces();
                 }
             }
         });
     }
 
-    // --- LiveData getters (保持不變) ---
+    // --- LiveData getters ---
     public LiveData<List<Place>> getPlaces() { return places; }
     public LiveData<Boolean> getIsLoading() { return isLoading; }
     public LiveData<String> getError() { return error; }
@@ -86,22 +88,28 @@ public class HomeViewModel extends AndroidViewModel {
     public LiveData<Boolean> getIsLoadingTrash() { return isLoadingTrash; }
     public LiveData<String> getTrashError() { return trashError; }
 
-
-    // ---------------- 載入店家（已改造為純背景執行） ----------------
-
-    /** 依目前 selectedTags + tagMatchMode 進行載入（只走 Room）。 */
+    /** 主邏輯：載入店家並篩選 **/
     public void loadPlaces() {
         if (Boolean.TRUE.equals(isLoading.getValue())) return;
         isLoading.postValue(true);
         error.postValue(null);
-        emptyMessage.postValue("正在載入店家...");
 
-        List<String> tags = selectedTags.getValue() != null ? selectedTags.getValue() : Collections.emptyList();
-        loadFromLocal(tags);
+        List<String> selectedCategories = selectedTags.getValue() != null ? selectedTags.getValue() : Collections.emptyList();
+        String keyword = searchQuery.getValue() != null ? searchQuery.getValue() : "";
+        TagMatchMode mode = tagMatchMode.getValue() != null ? tagMatchMode.getValue() : TagMatchMode.ALL;
+
+        emptyMessage.postValue("正在載入店家...");
+        loadFromLocal(keyword, selectedCategories, mode);
     }
 
     public void applyTagFilter(List<String> selected) {
         selectedTags.postValue(selected != null ? selected : new ArrayList<>());
+        loadPlaces();
+    }
+
+    public void applySearchQuery(String query) {
+        if (Objects.equals(searchQuery.getValue(), query)) return;
+        searchQuery.setValue(query != null ? query.trim() : "");
         loadPlaces();
     }
 
@@ -120,83 +128,120 @@ public class HomeViewModel extends AndroidViewModel {
         loadPlaces();
     }
 
-    private void loadFromLocal(List<String> selectedCategories) {
-        // 步驟 1：【主執行緒】準備好所有需要傳遞給背景執行緒的「安全資料」。
-        // 這樣可以完全避免在背景執行緒中直接存取 favStore，從而根除崩潰問題。
+    /** 針對 category 是 List<String> 的版本 **/
+    private void loadFromLocal(String keyword, List<String> selectedRaw, TagMatchMode mode) {
         final Set<String> favoriteIds = new HashSet<>();
-        List<Place> currentFavorites = favStore.getAll(); // 從 favStore 取得當前的「最愛」列表快照
+        List<Place> currentFavorites = favStore.getAll();
         if (currentFavorites != null) {
-            for (Place p : currentFavorites) {
-                if (p != null && p.id != null) {
-                    favoriteIds.add(p.id);
-                }
-            }
+            for (Place p : currentFavorites) if (p != null && p.id != null) favoriteIds.add(p.id);
         }
 
-        // 步驟 2：【切換到背景執行緒】開始執行耗時的資料庫查詢和過濾。
+        final List<String> wantedCats = normalizeStrings(selectedRaw);
+
         viewModelExecutor.execute(() -> {
             try {
-                // 步驟 2.1：準備資料庫查詢所需的參數。
-                String keyword = "";
-                String dishLike = "";
-                String priceEq = "";
-                // DAO 目前只支援單一標籤，所以暫時取第一個。
-                String singleCategory = (selectedCategories != null && !selectedCategories.isEmpty()) ? selectedCategories.get(0) : "";
-                int categoryCount = (selectedCategories != null) ? selectedCategories.size() : 0;
+                final boolean singleCat = (wantedCats.size() == 1);
+                final String dbCategory = singleCat ? wantedCats.get(0) : "";
 
-                // 步驟 2.2：在背景執行緒中執行耗時的資料庫查詢。
-                List<StoreEntity> entities = storeRepo.searchAdvancedBlocking(keyword, singleCategory, categoryCount, dishLike, priceEq);
+                List<StoreEntity> candidates = storeRepo.searchAdvancedBlocking(
+                        keyword,
+                        dbCategory,
+                        1,
+                        keyword,
+                        ""
+                );
 
-                // 步驟 2.3：將資料庫模型轉換為 UI 模型。
-                List<Place> allPlacesFromDb = StoreMappers.toPlaceList(entities);
-                if (allPlacesFromDb == null) {
-                    allPlacesFromDb = new ArrayList<>(); // 確保不是 null
-                }
+                List<StoreEntity> afterCats = new ArrayList<>();
+                if (wantedCats.isEmpty()) {
+                    afterCats = candidates;
+                } else {
+                    for (StoreEntity e : candidates) {
+                        if (e == null || e.category == null) continue;
 
-                // 步驟 2.4：執行過濾操作，移除「不喜歡」和「已收藏」的項目。
-                Set<String> dislikedIds = getDislikedIds(); // 從 SharedPreferences 讀取，這是執行緒安全的。
-                List<Place> filteredResult = new ArrayList<>();
-                for (Place p : allPlacesFromDb) {
-                    if (p == null || p.id == null) continue;
-
-                    // 直接使用從主執行緒傳進來的 `favoriteIds` 快照，絕對安全！
-                    if (!dislikedIds.contains(p.id) && !favoriteIds.contains(p.id)) {
-                        filteredResult.add(p);
+                        Set<String> storeCats = toLowerSet(e.category);
+                        boolean pass = matchesByCategories(storeCats, wantedCats, mode);
+                        if (pass) afterCats.add(e);
                     }
                 }
 
-                // 步驟 3：【切換回主執行緒】將最終處理好的結果，透過 postValue 更新 UI。
-                if (filteredResult.isEmpty()) {
-                    emptyMessage.postValue("找不到符合的店家，試試看別的篩選條件吧！");
+                List<Place> mapped = StoreMappers.toPlaceList(afterCats);
+
+                Set<String> dislikedIds = getDislikedIds();
+                List<Place> finalResult = new ArrayList<>();
+                for (Place p : mapped) {
+                    if (p == null || p.id == null) continue;
+                    if (!dislikedIds.contains(p.id) && !favoriteIds.contains(p.id)) {
+                        finalResult.add(p);
+                    }
                 }
-                // 發送最終的、乾淨的卡片列表。
-                places.postValue(filteredResult);
+
+                if (finalResult.isEmpty()) {
+                    emptyMessage.postValue("找不到符合的店家，試試看調整類別或關鍵字。");
+                }
+                Log.d(TAG, "篩選後結果: " + finalResult.size() + " 筆, 選擇類別=" + wantedCats);
+                places.postValue(finalResult);
 
             } catch (Exception e) {
-                // 統一的錯誤處理
-                Log.e(TAG, "loadFromLocal 在背景執行緒中發生錯誤", e);
-                error.postValue("載入資料時發生未知錯誤");
+                Log.e(TAG, "loadFromLocal error", e);
+                error.postValue("載入資料時發生錯誤");
             } finally {
-                // 無論成功或失敗，最後都標示為載入結束。
                 isLoading.postValue(false);
             }
         });
     }
 
-    // ---------------- Dislikes (SharedPreferences) ----------------
+    // --- 篩選邏輯 ---
+    private boolean matchesByCategories(Set<String> storeCats, List<String> wantedCats, TagMatchMode mode) {
+        if (wantedCats == null || wantedCats.isEmpty()) return true;
+        if (storeCats == null || storeCats.isEmpty()) return false;
 
-    public void addToDislikes(Place place) {
-        if (place == null || place.id == null) return;
-        addPlaceToDislikesInternal(place);
+        if (mode == TagMatchMode.ALL) {
+            for (String w : wantedCats) if (!storeCats.contains(w)) return false;
+            return true;
+        } else { // ANY
+            for (String w : wantedCats) if (storeCats.contains(w)) return true;
+            return false;
+        }
     }
 
-    private void addPlaceToDislikesInternal(Place place) {
+    // --- Normalization ---
+    private static String norm(String s) {
+        if (s == null) return "";
+        String x = s.replace("\ufeff", "")
+                .replace("\u200b", "").replace("\u200c", "").replace("\u200d", "")
+                .trim();
+        x = Normalizer.normalize(x, Normalizer.Form.NFKC);
+        return x.toLowerCase(Locale.ROOT);
+    }
+
+    private List<String> normalizeStrings(List<String> items) {
+        List<String> out = new ArrayList<>();
+        if (items == null) return out;
+        for (String s : items) {
+            String t = norm(s);
+            if (!t.isEmpty() && !out.contains(t)) out.add(t);
+        }
+        return out;
+    }
+
+    private Set<String> toLowerSet(List<String> items) {
+        Set<String> out = new HashSet<>();
+        if (items == null) return out;
+        for (String s : items) {
+            String t = norm(s);
+            if (!t.isEmpty()) out.add(t);
+        }
+        return out;
+    }
+
+    // --- Dislikes ---
+    public void addToDislikes(Place place) {
         if (place == null || place.id == null) return;
         viewModelExecutor.execute(() -> {
             Set<String> ids = new HashSet<>(prefs.getStringSet(DISLIKED_PLACES_KEY, Collections.emptySet()));
             if (ids.add(place.id)) {
                 prefs.edit().putStringSet(DISLIKED_PLACES_KEY, ids).apply();
-                loadDislikedPlacesFromPrefs(); // 觸發更新垃圾桶列表
+                loadDislikedPlacesFromPrefs();
             }
         });
     }
@@ -204,10 +249,7 @@ public class HomeViewModel extends AndroidViewModel {
     private Set<String> getDislikedIds() {
         return new HashSet<>(prefs.getStringSet(DISLIKED_PLACES_KEY, Collections.emptySet()));
     }
-    private void saveDislikedIds(Set<String> ids) {
-        if (ids == null) return;
-        prefs.edit().putStringSet(DISLIKED_PLACES_KEY, ids).apply();
-    }
+
     public void loadDislikedPlacesFromPrefs() {
         isLoadingTrash.postValue(true);
         trashError.postValue(null);
@@ -219,38 +261,27 @@ public class HomeViewModel extends AndroidViewModel {
                     dislikedPlaces.postValue(new ArrayList<>());
                     return;
                 }
-
-                // 1. 呼叫 Repository 的 blocking 方法
                 List<StoreEntity> entities = storeRepo.getByIdsBlocking(new ArrayList<>(ids));
-
-                // 2. 轉換模型
                 List<Place> list = StoreMappers.toPlaceList(entities);
-
-                // 3. 更新 UI
                 dislikedPlaces.postValue(list != null ? list : new ArrayList<>());
-
             } catch (Exception e) {
                 Log.e(TAG, "loadDislikedPlacesFromPrefs failed", e);
                 trashError.postValue("讀取垃圾桶失敗：" + e.getMessage());
             } finally {
-                // 無論成功或失敗，最後都標示為載入結束
                 isLoadingTrash.postValue(false);
             }
         });
     }
 
     public void removeFromDislikes(String placeId) {
-        if (placeId == null) {
-            return;
-        }
+        if (placeId == null) return;
         viewModelExecutor.execute(() -> {
             try {
                 Set<String> dislikedIds = getDislikedIds();
                 if (dislikedIds.remove(placeId)) {
-                    saveDislikedIds(dislikedIds);
-
-                    loadDislikedPlacesFromPrefs(); // 重新載入垃圾桶列表
-                    loadPlaces(); // 讓主畫面的卡片堆也重新整理
+                    prefs.edit().putStringSet(DISLIKED_PLACES_KEY, dislikedIds).apply();
+                    loadDislikedPlacesFromPrefs();
+                    loadPlaces();
                 } else {
                     trashError.postValue("在垃圾桶中找不到該項目，可能已被復原。");
                 }
@@ -261,10 +292,9 @@ public class HomeViewModel extends AndroidViewModel {
         });
     }
 
-
     @Override
     protected void onCleared() {
         super.onCleared();
-        viewModelExecutor.shutdown(); // 在 ViewModel 銷毀時關閉執行緒池
+        viewModelExecutor.shutdown();
     }
 }

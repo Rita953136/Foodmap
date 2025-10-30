@@ -49,7 +49,7 @@ public class ChatFragment extends Fragment {
     private List<String> pendingTags = null;
 
     // Agent Builder / ngrok 的網址
-    private final String chatUrl = "https://unfactored-wittily-karleen.ngrok-free.dev/demo";
+    private final String chatUrl = "https://unfactored-wittily-karleen.ngrok-free.dev/";
 
     public ChatFragment() {}
 
@@ -85,10 +85,9 @@ public class ChatFragment extends Fragment {
             int i = 0;
             for (String t : tags) {
                 if (t == null) continue;
-                if (i++ >= 12) break; // 上限避免爆版
+                if (i++ >= 12) break;
                 arr.put(t);
             }
-            // 補上 targetOrigin '*'
             String js = "window.postMessage({type:'TAGS_SET_VISIBLE', tags:" + arr.toString() + "}, '*');";
             runJs(js);
         } catch (Exception ignore) {}

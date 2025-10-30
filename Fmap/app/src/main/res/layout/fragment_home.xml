@@ -1,37 +1,82 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 1. 將根佈局從 FrameLayout 改為垂直方向的 LinearLayout -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F2F2F7">
+    android:orientation="vertical"
+    android:background="#F2F2F7"
+    tools:context=".ui.home.HomeFragment">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvCards"
+    <androidx.appcompat.widget.SearchView
+        android:id="@+id/search_view"
+        android:layout_width="374dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/search_view_background"
+        app:iconifiedByDefault="false"
+        app:queryHint="搜尋店名" />
+
+    <HorizontalScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone" />
-
-    <!--  1. 新增讀取圈 (ProgressBar) -->
-    <ProgressBar
-        android:id="@+id/loading_indicator"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:visibility="gone" /> <!-- 初始時隱藏 -->
+        android:scrollbars="none">
 
-    <!-- 空狀態 View -->
-    <LinearLayout
-        android:id="@+id/emptyView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone"> <!-- 初始時隱藏 -->
-
-        <TextView
-            android:id="@+id/tvEmpty"
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_tags"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="正在載入店家..."
-            android:textSize="18sp" />
-    </LinearLayout>
-</FrameLayout>
+            android:paddingHorizontal="16dp"
+            app:singleLine="true"/>
+    </HorizontalScrollView>
+
+    <!-- 4. 將原本的卡片列表、讀取圈、空狀態，全部放進一個 FrameLayout 中 -->
+    <!--    這樣它們就可以互相重疊，一次只顯示其中一個 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- 卡片列表 (你的 RecyclerView) -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvCards"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="16dp"
+            android:clipToPadding="false"
+            android:visibility="gone"
+            tools:visibility="visible"/>
+
+        <!-- 讀取圈 (ProgressBar) -->
+        <ProgressBar
+            android:id="@+id/loading_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"
+            tools:visibility="gone" />
+
+        <!-- 空狀態文字 (例如找不到店家) -->
+        <LinearLayout
+            android:id="@+id/emptyView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvEmpty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="找不到符合條件的店家"
+                android:textSize="18sp" />
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

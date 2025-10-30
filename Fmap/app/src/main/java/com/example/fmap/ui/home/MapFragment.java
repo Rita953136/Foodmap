@@ -11,12 +11,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import com.example.fmap.R;
+import com.example.fmap.model.Place;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -29,13 +31,13 @@ import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PointOfInterest;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     private GoogleMap map;
     private FusedLocationProviderClient fusedClient;
     private ActivityResultLauncher<String[]> permissionLauncher;
+    private HomeViewModel homeViewModel;
 
     public MapFragment() { }
 
@@ -50,6 +52,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        homeViewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
 
         // Play Services check (避免在沒有/過期時直接崩潰)
         int status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(requireContext());
@@ -97,14 +100,23 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         ui.setAllGesturesEnabled(true);
         ui.setMyLocationButtonEnabled(true); // 顯示 Google Map 內建的「定位」按鈕
 
-        map.setOnPoiClickListener(new GoogleMap.OnPoiClickListener() {
-            @Override
-            public void onPoiClick(@NonNull PointOfInterest poi) {
-                map.addMarker(new MarkerOptions()
-                        .position(poi.latLng)
-                        .title(poi.name))
-                        .showInfoWindow();
+        map.setOnMarkerClickListener(marker -> {
+            // 1. 從被點擊的圖釘(Marker)中，拿出我們之前存進去的 Place 物件
+            Object tag = marker.getTag();
+            if (tag instanceof Place) {
+                Place clickedStore = (Place) tag;
+
+                // 2.【關鍵】呼叫你已經寫好的 PlaceDetailFragment.newInstance() 方法
+                //    我們把店家的 ID 和完整的 Place 物件都傳進去。
+                //    這樣 BottomSheet 一彈出來就能立刻顯示基本資訊，同時還會在背景根據 ID 讀取最新資料。
+                PlaceDetailFragment sheet = PlaceDetailFragment.newInstance(clickedStore.getId(), clickedStore);
+
+                // 3. 顯示這個準備好資料的 BottomSheet
+                //    使用 getChildFragmentManager() 是在 Fragment 中顯示另一個 Fragment 的標準做法
+                sheet.show(getChildFragmentManager(), "PlaceDetailFragmentSheet");
             }
+            // 回傳 true 可以避免地圖預設的 info window (白色小氣泡) 彈出，讓我們的 BottomSheet 成為唯一焦點，使用者體驗更好。
+            return true;
         });
 
         // 先嘗試開啟定位（如果授權會自動置中）
