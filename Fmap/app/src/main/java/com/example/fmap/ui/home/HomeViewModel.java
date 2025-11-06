@@ -32,7 +32,10 @@ import java.util.concurrent.Executors;
 
 public class HomeViewModel extends AndroidViewModel {
 
+    // ===== Debug 開關 =====
     private static final String TAG = "HomeViewModel";
+    private static final boolean DEBUG_LOG_PLACES     = true;   // 印出筆數與前幾筆內容
+    private static final boolean DEBUG_BYPASS_FILTERS = false;  // 設 true 時，忽略所有過濾，直接把 mapped 丟給 UI
 
     public enum TagMatchMode { ANY, ALL }
 
@@ -71,9 +74,12 @@ public class HomeViewModel extends AndroidViewModel {
         storeRepo.initFromAssets(app);
         storeRepo.getDbReady().observeForever(ready -> {
             if (Boolean.TRUE.equals(ready)) {
+                if (DEBUG_LOG_PLACES) Log.d(TAG, "DB ready → trigger loadPlaces()");
                 if (places.getValue() == null || places.getValue().isEmpty()) {
                     loadPlaces();
                 }
+            } else {
+                if (DEBUG_LOG_PLACES) Log.d(TAG, "DB not ready yet");
             }
         });
     }
@@ -98,6 +104,9 @@ public class HomeViewModel extends AndroidViewModel {
         String keyword = searchQuery.getValue() != null ? searchQuery.getValue() : "";
         TagMatchMode mode = tagMatchMode.getValue() != null ? tagMatchMode.getValue() : TagMatchMode.ALL;
 
+        if (DEBUG_LOG_PLACES) {
+            Log.d(TAG, "loadPlaces(): keyword=" + keyword + ", selectedCategories=" + selectedCategories + ", mode=" + mode + ", BYPASS=" + DEBUG_BYPASS_FILTERS);
+        }
         emptyMessage.postValue("正在載入店家...");
         loadFromLocal(keyword, selectedCategories, mode);
     }
@@ -143,6 +152,10 @@ public class HomeViewModel extends AndroidViewModel {
                 final boolean singleCat = (wantedCats.size() == 1);
                 final String dbCategory = singleCat ? wantedCats.get(0) : "";
 
+                if (DEBUG_LOG_PLACES) {
+                    Log.d(TAG, "loadFromLocal(): query db with keyword=" + keyword + ", dbCategory=" + dbCategory);
+                }
+
                 List<StoreEntity> candidates = storeRepo.searchAdvancedBlocking(
                         keyword,
                         dbCategory,
@@ -150,6 +163,9 @@ public class HomeViewModel extends AndroidViewModel {
                         keyword,
                         ""
                 );
+                if (DEBUG_LOG_PLACES) {
+                    Log.d(TAG, "candidates (raw from DB) size=" + (candidates == null ? 0 : candidates.size()));
+                }
 
                 List<StoreEntity> afterCats = new ArrayList<>();
                 if (wantedCats.isEmpty()) {
@@ -157,28 +173,67 @@ public class HomeViewModel extends AndroidViewModel {
                 } else {
                     for (StoreEntity e : candidates) {
                         if (e == null || e.category == null) continue;
-
                         Set<String> storeCats = toLowerSet(e.category);
                         boolean pass = matchesByCategories(storeCats, wantedCats, mode);
                         if (pass) afterCats.add(e);
                     }
                 }
 
+                // DB → UI 模型
                 List<Place> mapped = StoreMappers.toPlaceList(afterCats);
-
-                Set<String> dislikedIds = getDislikedIds();
-                List<Place> finalResult = new ArrayList<>();
-                for (Place p : mapped) {
-                    if (p == null || p.id == null) continue;
-                    if (!dislikedIds.contains(p.id) && !favoriteIds.contains(p.id)) {
-                        finalResult.add(p);
+                if (DEBUG_LOG_PLACES) {
+                    Log.d(TAG, "mapped to Place size=" + (mapped == null ? 0 : mapped.size()));
+                    if (mapped != null && !mapped.isEmpty()) {
+                        int show = Math.min(5, mapped.size());
+                        for (int i = 0; i < show; i++) {
+                            Place p = mapped.get(i);
+                            Log.d(TAG, String.format(Locale.ROOT,
+                                    "mapped[%d] id=%s name=%s lat=%s lng=%s",
+                                    i, p == null ? "null" : p.id,
+                                    p == null ? "null" : p.getName(),
+                                    p == null ? "null" : String.valueOf(p.getLat()),
+                                    p == null ? "null" : String.valueOf(p.getLng())));
+                        }
                     }
                 }
 
-                if (finalResult.isEmpty()) {
+                List<Place> finalResult;
+                if (DEBUG_BYPASS_FILTERS) {
+                    // 直接把 mapped 丟給 UI，協助定位：資料是否有讀到 / 是否含座標
+                    finalResult = mapped != null ? mapped : new ArrayList<>();
+                } else {
+                    // 原本過濾：排除喜歡與不喜歡
+                    Set<String> dislikedIds = getDislikedIds();
+                    finalResult = new ArrayList<>();
+                    if (mapped != null) {
+                        for (Place p : mapped) {
+                            if (p == null || p.id == null) continue;
+                            if (!dislikedIds.contains(p.id) && !favoriteIds.contains(p.id)) {
+                                finalResult.add(p);
+                            }
+                        }
+                    }
+                }
+
+                if (DEBUG_LOG_PLACES) {
+                    Log.d(TAG, "finalResult size=" + (finalResult == null ? 0 : finalResult.size()));
+                    if (finalResult != null && !finalResult.isEmpty()) {
+                        int show = Math.min(5, finalResult.size());
+                        for (int i = 0; i < show; i++) {
+                            Place p = finalResult.get(i);
+                            Log.d(TAG, String.format(Locale.ROOT,
+                                    "final[%d] id=%s name=%s lat=%s lng=%s",
+                                    i, p == null ? "null" : p.id,
+                                    p == null ? "null" : p.getName(),
+                                    p == null ? "null" : String.valueOf(p.getLat()),
+                                    p == null ? "null" : String.valueOf(p.getLng())));
+                        }
+                    }
+                }
+
+                if (finalResult == null || finalResult.isEmpty()) {
                     emptyMessage.postValue("找不到符合的店家，試試看調整類別或關鍵字。");
                 }
-                Log.d(TAG, "篩選後結果: " + finalResult.size() + " 筆, 選擇類別=" + wantedCats);
                 places.postValue(finalResult);
 
             } catch (Exception e) {
@@ -189,6 +244,7 @@ public class HomeViewModel extends AndroidViewModel {
             }
         });
     }
+
 
     // --- 篩選邏輯 ---
     private boolean matchesByCategories(Set<String> storeCats, List<String> wantedCats, TagMatchMode mode) {

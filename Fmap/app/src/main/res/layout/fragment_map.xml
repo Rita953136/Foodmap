@@ -11,5 +11,45 @@
         android:id="@+id/map_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+    <LinearLayout
+        android:id="@+id/map_search_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="12dp"
+        android:padding="8dp"
+        android:orientation="horizontal"
+        android:background="@drawable/search_view_background"
+        android:elevation="8dp"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/et_map_search"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:hint="搜尋地點或店名"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:background="@android:color/transparent"/>
+
+        <ImageButton
+            android:id="@+id/btn_map_search"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="搜尋"
+            android:src="@android:drawable/ic_menu_search"/>
+
+        <ImageButton
+            android:id="@+id/btn_map_clear"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="清除"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"/>
+    </LinearLayout>
 
 </FrameLayout>

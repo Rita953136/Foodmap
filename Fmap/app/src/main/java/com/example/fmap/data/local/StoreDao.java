@@ -53,4 +53,14 @@ public interface StoreDao {
      */
     @Query("SELECT * FROM stores WHERE id IN (:ids)")
     List<StoreEntity> getByIdsBlocking(List<String> ids);
+
+    // 模糊搜尋（名稱 / 地址 / 分類字串），分類參數可留空
+    @Query("SELECT * FROM stores WHERE store_name LIKE :pattern OR address LIKE :pattern")
+    List<StoreEntity> searchFuzzy(String pattern);
+
+    @Query("SELECT * FROM stores WHERE store_name LIKE :pattern OR address LIKE :pattern")
+    List<StoreEntity> searchByNameOrAddressFuzzy(String pattern);
+
+    @Query("SELECT * FROM stores")
+    List<StoreEntity> getAll();
 }

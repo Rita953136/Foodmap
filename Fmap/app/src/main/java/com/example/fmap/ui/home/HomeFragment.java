@@ -2,16 +2,19 @@ package com.example.fmap.ui.home;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.widget.SearchView;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
@@ -30,7 +33,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Set;
 
 public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClickListener {
@@ -43,7 +45,10 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
     private PlacesAdapter adapter;
     private HomeViewModel homeViewModel;
     private ChipGroup chipGroupTags;
-    private SearchView searchView;
+
+    // 自訂搜尋列（與 Map 相同樣式）
+    private EditText etHomeSearch;
+    private ImageButton btnHomeSearch, btnHomeClear;
 
     // Drawer
     private DrawerLayout drawerLayout;
@@ -53,11 +58,7 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
     private final DrawerLayout.DrawerListener drawerListener = new DrawerLayout.SimpleDrawerListener() {
         @Override
         public void onDrawerClosed(@NonNull View drawerView) {
-            // 若指定目標 drawer id，且這次關閉的不是它，則跳過
-            if (TARGET_DRAWER_VIEW_ID != 0 && drawerView.getId() != TARGET_DRAWER_VIEW_ID) {
-                return;
-            }
-            // 側邊欄關閉 → 套用目前 chips 勾選
+            if (TARGET_DRAWER_VIEW_ID != 0 && drawerView.getId() != TARGET_DRAWER_VIEW_ID) return;
             List<String> selected = collectSelectedCategoriesFromChips();
             if (!sameAsViewModel(selected)) {
                 Log.d(TAG, "DrawerClosed -> 套用類別: " + selected);
@@ -89,9 +90,9 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
         initViews(v);
         ensureChipGroupMultiSelect();
         setupRecyclerView();
-        // 若你想「勾選當下就更新」可打開下一行；但依你的需求，我們改為「關閉側欄才更新」所以不綁即時更新
+        bindSearchBar();          // ★ 改用自訂搜尋列
+        // 若你想「勾選當下就更新」可打開下一行；目前需求是關閉側欄才更新所以不啟用
         // bindChipImmediateUpdate();
-        setupSearchView();
         observeViewModel();
 
         // 取得 DrawerLayout 並註冊監聽（假設 Activity 的 DrawerLayout id 為 drawer_layout）
@@ -112,8 +113,12 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
         emptyView = view.findViewById(R.id.emptyView);
         tvEmpty = view.findViewById(R.id.tvEmpty);
         loadingIndicator = view.findViewById(R.id.loading_indicator);
-        chipGroupTags = view.findViewById(R.id.chip_group_tags); // 直接對應你提供的 XML id
-        searchView = view.findViewById(R.id.search_view);
+        chipGroupTags = view.findViewById(R.id.chip_group_tags);
+
+        // 自訂搜尋列（請確保 fragment_home.xml 已有這三個 id）
+        etHomeSearch = view.findViewById(R.id.et_home_search);
+        btnHomeSearch = view.findViewById(R.id.btn_home_search);
+        btnHomeClear = view.findViewById(R.id.btn_home_clear);
     }
 
     /** 保險：即便 XML 設了，仍強制一次多選 */
@@ -145,6 +150,41 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
         itemTouchHelper.attachToRecyclerView(rvCards);
     }
 
+    /** 與 Map 搜尋列相同行為：鍵盤送出、搜尋按鈕、清除按鈕 */
+    private void bindSearchBar() {
+        if (etHomeSearch == null) return;
+
+        // 鍵盤「搜尋」動作
+        etHomeSearch.setOnEditorActionListener((TextView v, int actionId, KeyEvent event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH
+                    || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN)) {
+                String q = etHomeSearch.getText() != null ? etHomeSearch.getText().toString() : "";
+                homeViewModel.applySearchQuery(q);
+                etHomeSearch.clearFocus();
+                return true;
+            }
+            return false;
+        });
+
+        // 右側搜尋按鈕
+        if (btnHomeSearch != null) {
+            btnHomeSearch.setOnClickListener(v -> {
+                String q = etHomeSearch.getText() != null ? etHomeSearch.getText().toString() : "";
+                homeViewModel.applySearchQuery(q);
+                etHomeSearch.clearFocus();
+            });
+        }
+
+        // 清除按鈕
+        if (btnHomeClear != null) {
+            btnHomeClear.setOnClickListener(v -> {
+                etHomeSearch.setText("");
+                homeViewModel.applySearchQuery("");
+                etHomeSearch.clearFocus();
+            });
+        }
+    }
+
     /**
      * （可選）若你同時也想在「勾選 chip 當下」就更新，打開 onViewCreated 裡的呼叫並保留此方法
      * 目前依你的需求（關閉側欄才刷新），預設不啟用。
@@ -155,22 +195,6 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
             List<String> selected = collectSelectedCategoriesFromChips();
             Log.d(TAG, "UI -> 即時選取類別: " + selected);
             homeViewModel.applyTagFilter(selected);
-        });
-    }
-
-    /** SearchView：即時同步關鍵字進 ViewModel */
-    private void setupSearchView() {
-        if (searchView == null) return;
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override public boolean onQueryTextSubmit(String query) {
-                homeViewModel.applySearchQuery(query);
-                searchView.clearFocus();
-                return true;
-            }
-            @Override public boolean onQueryTextChange(String newText) {
-                homeViewModel.applySearchQuery(newText);
-                return true;
-            }
         });
     }
 

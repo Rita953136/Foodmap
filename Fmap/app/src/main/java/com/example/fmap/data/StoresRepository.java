@@ -106,11 +106,76 @@ public class StoresRepository {
      * 這個方法只是個傳聲筒，直接把收到的參數，傳給 DAO 去資料庫裡執行真正的搜尋。
      * "Blocking" 意味著這個方法會等待資料庫搜尋完成才回傳結果。
      */
-    public List<StoreEntity> searchAdvancedBlocking(String keyword, String category, int catCount, String dishLike, String priceEq) {
-        Log.d("StoresRepository", "在資料庫中執行搜尋: keyword=" + keyword + ", category=" + category);
-        // 直接呼叫 DAO 的方法，並回傳結果。
-        return storeDao.searchAdvancedBlocking(keyword, category, catCount, dishLike, priceEq);
+    public List<StoreEntity> searchAdvancedBlocking(
+            String keyword,
+            String dbCategory,
+            int someFlag,
+            String keyword2,
+            String somethingElse
+    ) {
+        String kw = (keyword == null) ? "" : keyword.trim();
+        String pattern = "%" + kw + "%"; // ⭐ 模糊搜尋
+        return storeDao.searchFuzzy(pattern);
     }
+    // === 新增：模糊搜尋（不改原本 searchAdvancedBlocking） ===
+    public List<StoreEntity> searchFuzzyBlocking(String keyword) {
+        final String kw = norm(keyword);
+        final String pattern = "%" + kw + "%";
+
+        // 1) 先用 SQL 對 name/address 做模糊查
+        List<StoreEntity> base = storeDao.searchByNameOrAddressFuzzy(pattern);
+
+        // 2) 若 keyword 很短或沒結果，你也可以把全部撈出來再做補強（可保留/可刪）
+        if ((base == null || base.isEmpty()) && kw.isEmpty()) {
+            base = storeDao.getAll();
+        }
+
+        // 3) 這裡只回傳 SQL 結果；如要再把 category/tags/menuItems 一起模糊比對，
+        //    可改為呼叫 searchFuzzyWithFieldsBlocking(keyword)（見下方進階版）
+        return base != null ? base : java.util.Collections.emptyList();
+    }
+
+    /** （可選進階）同時對 category/tags/menuItems 做 in-memory 模糊補強 */
+    public List<StoreEntity> searchFuzzyWithFieldsBlocking(String keyword) {
+        final String kw = norm(keyword);
+        final String pattern = "%" + kw + "%";
+
+        List<StoreEntity> base = storeDao.searchByNameOrAddressFuzzy(pattern);
+        if (base == null) base = new ArrayList<>();
+        if (kw.isEmpty()) return base; // 空關鍵字就不額外過濾
+
+        List<StoreEntity> out = new ArrayList<>();
+        for (StoreEntity e : base) {
+            if (e == null) continue;
+            if (containsIgnoreCase(e.storeName, kw)) { out.add(e); continue; }
+            if (containsIgnoreCase(e.address, kw))   { out.add(e); continue; }
+            if (e.category != null) {
+                for (String c : e.category) { if (containsIgnoreCase(c, kw)) { out.add(e); break; } }
+            }
+            if (e.tags != null) {
+                for (String t : e.tags) { if (containsIgnoreCase(t, kw)) { out.add(e); break; } }
+            }
+            if (e.menuItems != null) {
+                for (String m : e.menuItems) { if (containsIgnoreCase(m, kw)) { out.add(e); break; } }
+            }
+        }
+        return out;
+    }
+
+    // ====== 新增：工具函式（不影響既有程式） ======
+    private static String norm(String s) {
+        if (s == null) return "";
+        String x = s.replace("\ufeff","")
+                .replace("\u200b","").replace("\u200c","").replace("\u200d","")
+                .trim();
+        x = java.text.Normalizer.normalize(x, java.text.Normalizer.Form.NFKC);
+        return x.toLowerCase(java.util.Locale.ROOT);
+    }
+    private static boolean containsIgnoreCase(String text, String kw) {
+        if (text == null) return false;
+        return norm(text).contains(kw);
+    }
+
 
     /**
      * 透過 ID 列表查詢多家店。

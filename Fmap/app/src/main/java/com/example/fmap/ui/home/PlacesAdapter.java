@@ -90,7 +90,7 @@ public class PlacesAdapter extends RecyclerView.Adapter<PlacesAdapter.VH> {
         if (p == null) return "";
         List<String> tags = p.getTagsTop3();
         if (tags != null && !tags.isEmpty()) {
-            List<String> show = tags.size() > 3 ? tags.subList(0, 3) : tags;
+            List<String> show = tags.size() > 5 ? tags.subList(0, 5) : tags;
             return "#" + TextUtils.join(" #", show);
         }
         // 沒有標籤時的備援顯示：可改成 p.getAddress() 或價位等
