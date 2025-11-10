@@ -28,6 +28,10 @@ import com.example.fmap.model.Swipe;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
+// ★ 新增 import
+import com.example.fmap.util.LocationReporter;
+import java.util.Arrays;
+
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -106,6 +110,9 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
         if (homeViewModel.getPlaces().getValue() == null) {
             homeViewModel.loadPlaces();
         }
+
+        // ★★★ 一進主頁面就上報一次（同一進程只會送一次；沿用上次座標策略內建）
+        LocationReporter.reportOnceOnHome(requireContext(), getCurrentTagsOrDefault());
     }
 
     private void initViews(@NonNull View view) {
@@ -115,7 +122,7 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
         loadingIndicator = view.findViewById(R.id.loading_indicator);
         chipGroupTags = view.findViewById(R.id.chip_group_tags);
 
-        // 自訂搜尋列（請確保 fragment_home.xml 已有這三個 id）
+        // 自訂搜尋列
         etHomeSearch = view.findViewById(R.id.et_home_search);
         btnHomeSearch = view.findViewById(R.id.btn_home_search);
         btnHomeClear = view.findViewById(R.id.btn_home_clear);
@@ -296,5 +303,14 @@ public class HomeFragment extends Fragment implements PlacesAdapter.OnPlaceClick
                 place
         );
         f.show(getParentFragmentManager(), "place_detail");
+    }
+
+    // ★ 取得目前 tags（優先 VM，否則預設「咖哩」）
+    private List<String> getCurrentTagsOrDefault() {
+        try {
+            List<String> vm = homeViewModel.getSelectedTags().getValue();
+            if (vm != null && !vm.isEmpty()) return vm;
+        } catch (Throwable ignored) {}
+        return Arrays.asList("咖哩");
     }
 }

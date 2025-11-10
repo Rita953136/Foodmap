@@ -9,7 +9,6 @@ import android.graphics.drawable.Drawable;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -720,18 +719,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     // ====== 取得目前 tags：優先從 HomeViewModel 讀，否則退回 ["咖哩"] ======
     @NonNull
     private List<String> getCurrentTags(){
-        // 嘗試用反射讀取 homeViewModel.getSelectedTags() 的 LiveData<List<String>>
+        // 嘗試讀取 homeViewModel.getSelectedTags() 的 LiveData<List<String>>
         try {
-            Object live = homeViewModel.getClass().getMethod("getSelectedTags").invoke(homeViewModel);
-            if (live instanceof androidx.lifecycle.LiveData) {
-                Object val = ((androidx.lifecycle.LiveData<?>) live).getValue();
-                if (val instanceof List) {
-                    List<?> raw = (List<?>) val;
-                    List<String> out = new ArrayList<>();
-                    for (Object o : raw) if (o != null) out.add(o.toString());
-                    if (!out.isEmpty()) return out;
-                }
-            }
+            List<String> vm = homeViewModel.getSelectedTags().getValue();
+            if (vm != null && !vm.isEmpty()) return vm;
         } catch (Throwable ignored) {}
         // Fallback：示範用，請換成你要的預設
         return java.util.Arrays.asList("咖哩");
