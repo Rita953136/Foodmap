@@ -25,6 +25,7 @@ import androidx.fragment.app.FragmentTransaction;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.fmap.R;
+import com.example.fmap.ui.home.MapFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -320,23 +321,41 @@ public class MainActivity extends AppCompatActivity {
     // ====== Bottom Nav ======
     private void setupBottomNav() {
         bottomNav = findViewById(R.id.bottom_nav);
+
         bottomNav.setOnItemSelectedListener(item -> {
-            if (bottomNav.getSelectedItemId() == item.getItemId()) return false;
+            // 觀察實際被點到的 id 名稱，方便檢查 bottom_menu.xml 是否一致
+            try {
+                String name = getResources().getResourceEntryName(item.getItemId());
+                android.util.Log.d("BottomNav", "clicked: " + name + " (" + item.getItemId() + ")");
+            } catch (Exception ignore) {}
 
-            Fragment target = null;
             int id = item.getItemId();
-            if (id == R.id.home)      target = new HomeFragment();
-            else if (id == R.id.map)  target = new MapFragment();
-            else if (id == R.id.favorite) target = new FavoriteFragment();
+            Fragment target = null;
+            String tag = null;
 
-            if (target != null) {
-                getSupportFragmentManager().popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
-                getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, target)
-                        .setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE)
-                        .commit();
+            if (id == R.id.home) {
+                target = new HomeFragment();
+                tag = "HomeFragment";
+            } else if (id == R.id.map) {
+                target = new MapFragment();
+                tag = "MapFragment";
+            } else if (id == R.id.favorite) {
+                target = new FavoriteFragment();
+                tag = "FavoriteFragment";
+            } else {
+                // 沒對到任何已知 id，回傳 false 讓系統知道沒處理
+                return false;
             }
-            return true;
+
+            // 切頁
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .setReorderingAllowed(true)
+                    .replace(R.id.fragment_container, target, tag)
+                    .setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE)
+                    .commit();
+
+            return true; // 一定要回傳 true，代表這次點擊已處理
         });
     }
 
@@ -364,4 +383,22 @@ public class MainActivity extends AppCompatActivity {
         if (chatContainer != null) chatContainer.setVisibility(View.GONE);
         if (fabChat != null) fabChat.show();
     }
+    // ====== 供其他 Fragment 呼叫：切換到地圖頁，並帶座標 ======
+    public void openMapWithArgs(@Nullable Bundle args) {
+        MapFragment map = new MapFragment();
+        if (args != null) map.setArguments(args);
+
+        getSupportFragmentManager()
+                .beginTransaction()
+                .setReorderingAllowed(true)
+                .replace(R.id.fragment_container, map, "MapFragment")
+                .addToBackStack("MapFragment")
+                .commit();
+
+        // ★ 同步底部導覽顯示「地圖」
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.map); // ← 確認你的 bottom_menu.xml 地圖項目 id 是否叫 map
+        }
+    }
+
 }

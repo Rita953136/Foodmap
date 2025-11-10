@@ -2,8 +2,20 @@ package com.example.fmap.ui.home;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -13,10 +25,6 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
-
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
 
 import com.example.fmap.R;
 import com.example.fmap.model.Place;
@@ -29,21 +37,22 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
-import com.google.android.gms.maps.model.*;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import android.view.inputmethod.EditorInfo;
-import android.widget.EditText;
-import android.widget.ImageButton;
-import android.location.Address;
-import android.location.Geocoder;
 import java.util.Locale;
-import java.io.IOException;
-
+import java.util.Map;
+import java.util.concurrent.Executors;
 
 public class MapFragment extends Fragment implements OnMapReadyCallback {
 
@@ -55,28 +64,40 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private HomeViewModel homeViewModel;
 
     private final Map<String, Marker> markerById = new HashMap<>();
+    private BitmapDescriptor bluePinIcon; // 圖示快取
 
     // ---- 固定相機測試點（不影響店家顯示） ----
     private static final boolean DEV_FIX_LOCATION = true;
     private static final LatLng DEV_POINT = new LatLng(24.1658, 120.6422);
     private static final float DEV_ZOOM = 15f;
 
-    // 先顯示全部，避免把點過濾掉
+    // 顯示範圍圓
     private static final double SHOW_WITHIN_KM = 0.0;
     private Circle rangeCircle;
-    // 重要：用來解決「資料先到、地圖還沒 ready」的時序問題
+
+    // 地圖尚未 ready 時先緩存資料
     private List<Place> pendingPlaces = new ArrayList<>();
-    // 放大到幾倍顯示店名（可自行調 15.5~17 之間）
-    private static final float LABEL_ZOOM_THRESHOLD = 16.5f;
-    // 目前是否已顯示「店名標籤」狀態（避免每次移動都重算）
-    private boolean labelsShown = false;
-    // 快取：店名 → 文字圖示，避免每次放大都重繪
-    private final Map<String, BitmapDescriptor> labelIconCache = new HashMap<>();
+
     private EditText etSearch;
     private ImageButton btnSearch, btnClear;
-    public MapFragment() { }
 
+    // ====== 接收詳情頁帶來的參數（定位與高亮） ======
+    @Nullable private LatLng argCenter;
+    @Nullable private String argStoreId;
+    @Nullable private String argStoreName;
+    @Nullable private Place argFallbackPlace; // 找不到 marker 時直接開詳情
+    private boolean autoDetailPending = false; // 只自動開一次
+
+    // 若事件來時尚未畫 marker，先暫存，renderMarkers 後再聚焦
+    @Nullable private String pendingFocusPlaceId = null;
+
+    // 地圖 padding（避開搜尋列與底部導覽列）
+    private int pendingTopPadding = -1;
+
+    public MapFragment() { }
     public static MapFragment newInstance() { return new MapFragment(); }
+
+    // ---------------- Lifecycle ----------------
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -87,28 +108,102 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        // 1) ViewModel
         homeViewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
 
+        // 2) 參數
+        handleArguments();
+
+        // 3) 檢查 Google Play Services
+        if (!checkGooglePlayServices()) return;
+
+        // 4) UI & 定位
+        setupViews(view);
+        setupLocationServices();
+
+        // 5) Map
+        setupMapFragment();
+
+        // 6) 觀察 VM
+        observeViewModel();
+    }
+
+    // ---------------- Helpers (setup/args) ----------------
+
+    private void handleArguments() {
+        Bundle args = getArguments();
+        if (args == null) return;
+
+        double lat = args.getDouble("center_lat", Double.NaN);
+        double lng = args.getDouble("center_lng", Double.NaN);
+        if (!Double.isNaN(lat) && !Double.isNaN(lng)) argCenter = new LatLng(lat, lng);
+
+        argStoreId   = args.getString("store_id", null);
+        argStoreName = args.getString("store_name", null);
+        Object fp = args.getSerializable("fallback_place");
+        if (fp instanceof Place) argFallbackPlace = (Place) fp;
+
+        autoDetailPending = (argStoreId != null || argStoreName != null || argCenter != null || argFallbackPlace != null);
+    }
+
+    private boolean checkGooglePlayServices() {
         int status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(requireContext());
         if (status != ConnectionResult.SUCCESS) {
             GoogleApiAvailability.getInstance().getErrorDialog(requireActivity(), status, 1001).show();
-            return;
+            return false;
         }
+        return true;
+    }
 
+    private void setupViews(@NonNull View view) {
+        etSearch = view.findViewById(R.id.et_map_search);
+        btnSearch = view.findViewById(R.id.btn_map_search);
+        btnClear  = view.findViewById(R.id.btn_map_clear);
+
+        etSearch.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                handleSearch(etSearch.getText().toString().trim());
+                return true;
+            }
+            return false;
+        });
+
+        btnSearch.setOnClickListener(v -> handleSearch(etSearch.getText().toString().trim()));
+
+        btnClear.setOnClickListener(v -> {
+            etSearch.setText("");
+            homeViewModel.applySearchQuery("");
+            if (map != null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(DEV_POINT, DEV_ZOOM));
+        });
+
+        // 搜尋列高度 → map padding
+        final View searchBar = view.findViewById(R.id.map_search_bar);
+        if (searchBar != null) {
+            searchBar.post(() -> {
+                int top = searchBar.getHeight() + dp(16);
+                pendingTopPadding = top;
+                if (map != null) map.setPadding(0, top, dp(8), dp(88));
+            });
+        }
+    }
+
+    private void setupLocationServices() {
         fusedClient = LocationServices.getFusedLocationProviderClient(requireContext());
-
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(),
                 result -> {
                     boolean fine = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION));
                     boolean coarse = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
                     if (fine || coarse) {
-                        enableMyLocationAndCenter();
+                        enableMyLocationAndCenter(); // 只啟用圖層/按鈕，不移動鏡頭
                     } else {
                         Toast.makeText(requireContext(), "未授權定位權限，無法顯示我的位置", Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
 
+    private void setupMapFragment() {
         final String TAG_MAP = "child_map";
         SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentByTag(TAG_MAP);
         if (mapFragment == null) {
@@ -118,92 +213,102 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                     .commitNow();
         }
         mapFragment.getMapAsync(this);
+    }
 
-        etSearch = view.findViewById(R.id.et_map_search);
-        btnSearch = view.findViewById(R.id.btn_map_search);
-        btnClear  = view.findViewById(R.id.btn_map_clear);
-
-        // 鍵盤搜尋鍵
-        etSearch.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                handleSearch(etSearch.getText().toString().trim());
-                return true;
-            }
-            return false;
-        });
-
-        // 點擊放大鏡
-        btnSearch.setOnClickListener(v2 -> handleSearch(etSearch.getText().toString().trim()));
-
-        // 清除：清文字＋清關鍵字篩選＋回到固定點（若你開了 DEV_FIX_LOCATION）
-        btnClear.setOnClickListener(v3 -> {
-            etSearch.setText("");
-            homeViewModel.applySearchQuery("");   // 重設清單（你的 HomeViewModel 會重載 places）
-            if (map != null) {
-                // 視情況決定回到目前相機中心或固定點
-                map.animateCamera(CameraUpdateFactory.newLatLngZoom(DEV_POINT, DEV_ZOOM));
-            }
-        });
-
-
-        // 觀察店家：資料來就畫，並記錄 Log
+    private void observeViewModel() {
         homeViewModel.getPlaces().observe(getViewLifecycleOwner(), places -> {
             int n = places == null ? 0 : places.size();
             Log.d(TAG, "observer getPlaces() size=" + n);
-            Toast.makeText(requireContext(), "店家數：" + n, Toast.LENGTH_SHORT).show();
 
-            // 緩存最新資料；如果地圖還沒 ready，先存起來，等 ready 後再畫
             pendingPlaces = (places == null) ? new ArrayList<>() : new ArrayList<>(places);
-
-            if (map != null) {
-                renderMarkers(pendingPlaces);
-            }
+            if (map != null) renderMarkers(pendingPlaces);
         });
+
+        List<Place> cur = homeViewModel.getPlaces().getValue();
+        if (cur != null && !cur.isEmpty()) {
+            pendingPlaces = new ArrayList<>(cur);
+            if (map != null) renderMarkers(pendingPlaces);
+        } else {
+            homeViewModel.applySearchQuery("");
+        }
+
+        observeFocusRequests();
     }
+
+    // ---------------- Google Map ----------------
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
+        if (!isAdded()) return;
         this.map = googleMap;
         Log.d(TAG, "onMapReady()");
 
-        UiSettings ui = map.getUiSettings();
+        // 圖示快取（Vector→Bitmap）
+        if (bluePinIcon == null) bluePinIcon = bluePin(R.drawable.ic_store_pin);
+
+        UiSettings ui = this.map.getUiSettings();
         ui.setZoomControlsEnabled(true);
         ui.setCompassEnabled(true);
         ui.setMapToolbarEnabled(true);
         ui.setAllGesturesEnabled(true);
+        ui.setMyLocationButtonEnabled(true); // 內建定位按鈕
 
-        if (DEV_FIX_LOCATION) {
-            ui.setMyLocationButtonEnabled(false);
-            map.moveCamera(CameraUpdateFactory.newLatLngZoom(DEV_POINT, DEV_ZOOM));
+        // 啟用藍點與內建按鈕（不移動鏡頭）
+        enableMyLocationAndCenter();
+
+        // 初始鏡頭：argCenter > DEV_POINT > 不動
+        if (argCenter != null) {
+            this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(argCenter, 16f));
+        } else if (DEV_FIX_LOCATION) {
+            this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(DEV_POINT, DEV_ZOOM));
             drawRangeCircle();
-        } else {
-            ui.setMyLocationButtonEnabled(true);
-            enableMyLocationAndCenter();
         }
 
-        map.setOnMarkerClickListener(marker -> {
+        // 若先量到 padding 但 map 未就緒，這裡補上
+        if (pendingTopPadding >= 0) map.setPadding(0, pendingTopPadding, dp(8), dp(88));
+
+        // marker 點擊
+        this.map.setOnMarkerClickListener(marker -> {
             Object tag = marker.getTag();
             if (tag instanceof Place) {
                 Place p = (Place) tag;
                 PlaceDetailFragment.newInstance(p.getId(), p)
+                        .setSource(PlaceDetailFragment.SOURCE_MAP)
                         .show(getChildFragmentManager(), "PlaceDetailFragmentSheet");
             }
             return true;
         });
 
-        // 關鍵：地圖準備好後，立刻用「目前持有的清單」畫一次
+        // 監聽內建定位按鈕（回傳 false 交給預設行為）
+        this.map.setOnMyLocationButtonClickListener(() -> {
+            Toast.makeText(requireContext(), "正在聚焦到我的位置...", Toast.LENGTH_SHORT).show();
+            return false;
+        });
+
+        // 畫面上畫既有資料
         if (pendingPlaces != null && !pendingPlaces.isEmpty()) {
-            Log.d(TAG, "onMapReady(): draw pending places size=" + pendingPlaces.size());
             renderMarkers(pendingPlaces);
         } else {
-            // 若 ViewModel 早已準備好資料，這裡再取一次
             List<Place> cur = homeViewModel.getPlaces().getValue();
-            Log.d(TAG, "onMapReady(): draw places from VM size=" + (cur == null ? 0 : cur.size()));
             if (cur != null && !cur.isEmpty()) {
                 pendingPlaces = new ArrayList<>(cur);
                 renderMarkers(pendingPlaces);
             }
         }
+    }
+
+    private BitmapDescriptor bluePin(int vectorResId) {
+        Drawable d = ContextCompat.getDrawable(requireContext(), vectorResId);
+        if (d == null) return BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE);
+        d = d.mutate();
+        d.setTint(Color.parseColor("#42A5F5"));
+        int w = Math.max(d.getIntrinsicWidth(), 96);
+        int h = Math.max(d.getIntrinsicHeight(), 96);
+        Bitmap bm = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bm);
+        d.setBounds(0, 0, w, h);
+        d.draw(canvas);
+        return BitmapDescriptorFactory.fromBitmap(bm);
     }
 
     private void renderMarkers(List<Place> places) {
@@ -215,7 +320,12 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         markerById.clear();
         drawRangeCircle();
 
-        if (n == 0) return;
+        if (n == 0) {
+            if (argCenter != null) {
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(argCenter, 17f));
+            }
+            return;
+        }
 
         LatLngBounds.Builder bounds = new LatLngBounds.Builder();
         int added = 0;
@@ -225,7 +335,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             Double lat = p.getLat();
             Double lng = p.getLng();
             if (lat == null || lng == null) continue;
-            if (lat == 0.0 && lng == 0.0) continue; // 防 0,0
+            if (lat == 0.0 && lng == 0.0) continue;
 
             LatLng pos = new LatLng(lat, lng);
 
@@ -234,31 +344,104 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 if (km > SHOW_WITHIN_KM) continue;
             }
 
-            String title = p.getName() != null ? p.getName() : (p.getName() != null ? p.getName() : "");
-            String addr  = p.getAddress() != null ? p.getAddress() : (p.getAddress() != null ? p.getAddress() : "");
+            String title = p.getName() != null ? p.getName() : "";
+            String addr  = p.getAddress() != null ? p.getAddress() : "";
 
             MarkerOptions opts = new MarkerOptions()
                     .position(pos)
                     .title(title)
                     .snippet(addr)
-                    .icon(bluePin(R.drawable.ic_store_pin));
-
+                    .icon(bluePinIcon != null ? bluePinIcon
+                            : BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
 
             Marker m = map.addMarker(opts);
             if (m != null) {
                 m.setTag(p);
-                if (p.id != null) markerById.put(p.id, m);
+                if (p.getId() != null)   markerById.put(p.getId(), m);
+                if (p.getName() != null) markerById.put(p.getName(), m);
                 bounds.include(pos);
                 added++;
             }
         }
 
-        Log.d(TAG, "renderMarkers() added markers=" + added);
+        // 事件聚焦
+        if (pendingFocusPlaceId != null) {
+            if (tryFocusOn(pendingFocusPlaceId)) {
+                pendingFocusPlaceId = null;
+                return;
+            }
+        }
+
+        // 用 id/name 聚焦
+        Marker focus = null;
+        if (argStoreId != null) focus = markerById.get(argStoreId);
+        if (focus == null && argStoreName != null) focus = markerById.get(argStoreName);
+        if (focus != null) {
+            focus.showInfoWindow();
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(focus.getPosition(), 17f));
+            if (autoDetailPending) {
+                autoDetailPending = false;
+                Object tag = focus.getTag();
+                if (tag instanceof Place) {
+                    Place p = (Place) tag;
+                    PlaceDetailFragment.newInstance(p.getId(), p)
+                            .setSource(PlaceDetailFragment.SOURCE_MAP)
+                            .show(getChildFragmentManager(), "PlaceDetailFragmentSheet");
+                }
+            }
+            return;
+        }
+
+        // 找不到 marker 但有 fallback → 仍自動開詳情
+        if (autoDetailPending && argFallbackPlace != null) {
+            autoDetailPending = false;
+            if (argCenter != null) {
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(argCenter, 17f));
+            }
+            PlaceDetailFragment.newInstance(argFallbackPlace.getId(), argFallbackPlace)
+                    .setSource(PlaceDetailFragment.SOURCE_MAP)
+                    .show(getChildFragmentManager(), "PlaceDetailFragmentSheet");
+            return;
+        }
+
+        // 沒有 → 若有中心座標，放一顆紅標
+        if (argCenter != null) {
+            Marker temp = map.addMarker(new MarkerOptions()
+                    .position(argCenter)
+                    .title(argStoreName != null ? argStoreName : "目標位置")
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
+            if (temp != null) temp.showInfoWindow();
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(argCenter, 17f));
+            return;
+        }
+
+        // 一般情況：縮到全部可見或回固定點
         if (added > 0) {
             map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 80));
         } else if (DEV_FIX_LOCATION) {
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(DEV_POINT, DEV_ZOOM));
         }
+    }
+
+    //觀察 ViewModel 的聚焦事件
+    private void observeFocusRequests() {
+        homeViewModel.getNavigateToMapAndFocusOn().observe(getViewLifecycleOwner(), event -> {
+            String placeIdToFocus = event.getContentIfNotHandled();
+            if (placeIdToFocus == null) return;
+            if (!tryFocusOn(placeIdToFocus)) {
+                pendingFocusPlaceId = placeIdToFocus;
+            }
+        });
+    }
+
+    // 嘗試聚焦指定 id 的 marker，成功回傳 true
+    private boolean tryFocusOn(@NonNull String placeId) {
+        if (map == null) return false;
+        Marker m = markerById.get(placeId);
+        if (m == null) return false;
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(m.getPosition(), 17f));
+        m.showInfoWindow();
+        return true;
     }
 
     private void drawRangeCircle() {
@@ -288,13 +471,11 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         return R * c;
     }
 
+    /**
+     * 只負責：啟用藍點與內建定位按鈕。不自動移動鏡頭。
+     */
     private void enableMyLocationAndCenter() {
         if (map == null) return;
-
-        if (DEV_FIX_LOCATION) {
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(DEV_POINT, DEV_ZOOM));
-            return;
-        }
 
         boolean fineGranted = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         boolean coarseGranted = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
@@ -309,68 +490,48 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
         try {
             map.setMyLocationEnabled(true);
-            fusedClient.getLastLocation().addOnSuccessListener(location -> {
-                if (location != null) {
-                    LatLng me = new LatLng(location.getLatitude(), location.getLongitude());
-                    map.animateCamera(CameraUpdateFactory.newLatLngZoom(me, 15f));
-                }
-            });
+            map.getUiSettings().setMyLocationButtonEnabled(true);
+            // ❌ 不在這裡移動鏡頭，交給內建按鈕或使用者操作
         } catch (SecurityException ignored) { }
     }
-    /** 固定淡藍色圖釘（使用 vector pin 圖示） */
-    private BitmapDescriptor bluePin(int vectorResId) {
-        android.graphics.drawable.Drawable d = ContextCompat.getDrawable(requireContext(), vectorResId);
-        if (d == null) return BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE);
-        d = d.mutate();
 
-        // 固定顏色：Google Map Style 淡藍 #42A5F5
-        int color = android.graphics.Color.parseColor("#42A5F5");
-        d.setTint(color);
-
-        int w = d.getIntrinsicWidth();
-        int h = d.getIntrinsicHeight();
-        if (w <= 0) w = 96;
-        if (h <= 0) h = 96;
-
-        android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas canvas = new android.graphics.Canvas(bm);
-        d.setBounds(0, 0, w, h);
-        d.draw(canvas);
-
-        return BitmapDescriptorFactory.fromBitmap(bm);
-    }
-    /** 搜尋處理：同時做「資料篩選」與「地圖移動」 */
+    /** 搜尋處理（背景執行 Geocoder；主執行緒更新地圖或 Toast） */
     private void handleSearch(@NonNull String query) {
         if (query.isEmpty()) {
-            Toast.makeText(requireContext(), "請輸入關鍵字或地址", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "請輸入搜尋關鍵字", Toast.LENGTH_SHORT).show();
             return;
         }
-        // 1) 讓 HomeViewModel 依關鍵字重查，markers 會跟著 observer → renderMarkers()
         homeViewModel.applySearchQuery(query);
 
-        // 2) 嘗試把地圖移到這個文字描述的位置（像地址/地標）
-        geocodeAndMove(query);
-    }
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                Geocoder geocoder = new Geocoder(requireContext(), Locale.TRADITIONAL_CHINESE);
+                List<Address> list = geocoder.getFromLocationName(query, 1);
 
-    /** 以 Geocoder 嘗試把字串轉成座標並移動鏡頭 */
-    private void geocodeAndMove(String query) {
-        if (map == null) return;
-        Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
-        try {
-            // 取第一筆匹配結果（可視需求改多筆）
-            java.util.List<Address> list = geocoder.getFromLocationName(query, 1);
-            if (list != null && !list.isEmpty()) {
-                Address a = list.get(0);
-                LatLng pos = new LatLng(a.getLatitude(), a.getLongitude());
-                map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, 16f));
-            } else {
-                // 找不到也沒關係，仍然會透過 applySearchQuery 篩選你的店家
-                Toast.makeText(requireContext(), "找不到此位置，已改用清單篩選", Toast.LENGTH_SHORT).show();
+                if (list != null && !list.isEmpty()) {
+                    Address a = list.get(0);
+                    LatLng pos = new LatLng(a.getLatitude(), a.getLongitude());
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (map != null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, 15f));
+                        });
+                    }
+                } else {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() ->
+                                Toast.makeText(requireContext(), "找不到符合的地點", Toast.LENGTH_SHORT).show()
+                        );
+                    }
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Geocoder 搜尋失敗", e);
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() ->
+                            Toast.makeText(requireContext(), "搜尋服務異常，請稍後再試", Toast.LENGTH_SHORT).show()
+                    );
+                }
             }
-        } catch (IOException e) {
-            // 某些模擬器無網路/無 geocoder 資料時可能會進到這裡
-            Toast.makeText(requireContext(), "定位服務暫時無法使用，已改用清單篩選", Toast.LENGTH_SHORT).show();
-        }
+        });
     }
 
     @Override
@@ -389,5 +550,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setDrawerIconEnabled(true);
         }
+    }
+
+    private int dp(int dps) {
+        return (int) (dps * getResources().getDisplayMetrics().density);
     }
 }

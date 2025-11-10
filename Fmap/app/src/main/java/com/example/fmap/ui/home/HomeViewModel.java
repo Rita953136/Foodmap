@@ -48,6 +48,10 @@ public class HomeViewModel extends AndroidViewModel {
     private final MutableLiveData<TagMatchMode> tagMatchMode = new MutableLiveData<>(TagMatchMode.ALL);
     private final MutableLiveData<String> searchQuery = new MutableLiveData<>("");
 
+    //地圖聚焦事件（詳情頁呼叫 → 地圖頁觀察並置中）
+    private final MutableLiveData<Event<String>> _navigateToMapAndFocusOn = new MutableLiveData<>();
+    public LiveData<Event<String>> getNavigateToMapAndFocusOn() { return _navigateToMapAndFocusOn; }
+
     // --- Trash（不喜歡） ---
     private final MutableLiveData<List<Place>> dislikedPlaces = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoadingTrash = new MutableLiveData<>(false);
@@ -135,6 +139,13 @@ public class HomeViewModel extends AndroidViewModel {
             addToDislikes(place);
         }
         loadPlaces();
+    }
+
+    /** ✅ 新增：由 PlaceDetailFragment 呼叫，觸發「讓地圖聚焦到指定店家」 */
+    public void requestFocusOnPlace(String placeId) {
+        if (placeId != null && !placeId.isEmpty()) {
+            _navigateToMapAndFocusOn.setValue(new Event<>(placeId));
+        }
     }
 
     /** 針對 category 是 List<String> 的版本 **/
@@ -244,7 +255,6 @@ public class HomeViewModel extends AndroidViewModel {
             }
         });
     }
-
 
     // --- 篩選邏輯 ---
     private boolean matchesByCategories(Set<String> storeCats, List<String> wantedCats, TagMatchMode mode) {

@@ -1,4 +1,3 @@
-// 檔案路徑: app/src/main/java/com/example/fmap/ui/home/PlaceDetailFragment.java
 package com.example.fmap.ui.home;
 
 import android.app.Dialog;
@@ -21,10 +20,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.util.Log;
 
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.bumptech.glide.Glide;
 import com.example.fmap.R;
@@ -50,14 +49,22 @@ import java.util.Map;
 
 /**
  * 店家詳情（本機資料版）
- * - 使用你的 FavoritesStore（SharedPreferences）
- * - 使用你的 StoreRepository（ui.home wrapper -> data.StoresRepository）
+ * - FavoritesStore（SharedPreferences）
+ * - StoreRepository（ui.home wrapper -> data.StoresRepository）
  * - 營業時間支援「今天摘要 + 展開/收合」
+ * - 地圖按鈕行為依來源切換：
+ *   - 來源為 "map" → 外開 Google Maps 導航
+ *   - 其他來源（如 "home"）→ 跳到 App 的 MapFragment 並置中該店
+ * - 在進 App 內地圖頁前，透過 HomeViewModel 丟出「聚焦該店」事件（不影響原本導航與跳轉）
  */
 public class PlaceDetailFragment extends BottomSheetDialogFragment {
 
     private static final String ARG_PLACE_ID  = "place_id";
     private static final String ARG_PLACE_OBJ = "arg_place_obj";
+
+    // 來源常數
+    public static final String SOURCE_HOME = "home";
+    public static final String SOURCE_MAP  = "map";
 
     // Data
     private FavoritesStore favoritesStore;
@@ -67,6 +74,9 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
     private boolean isCurrentlyFavorite = false;
     private java.util.concurrent.ExecutorService executor;
 
+    // 來源（預設從首頁/列表進入）
+    private String source = SOURCE_HOME;
+
     // Views
     private ImageView imgThumb, ivHoursChevron;
     private TextView tvName, tvRating, tvMeta, tvPrice, tvAddress, tvPhone, tvHoursSummary;
@@ -74,6 +84,9 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
     private ChipGroup chipGroupTags, chipGroupMenu;
     private MaterialButton btnNavigate, btnHeart;
     private LinearLayout rowAddress, rowPhone, rowHoursHeader, hoursContainer;
+
+    // ✅ 新增：共用的 Activity-Scoped ViewModel（用於對 MapFragment 發送聚焦事件）
+    private HomeViewModel homeViewModel;
 
     public static PlaceDetailFragment newInstance(@Nullable String placeId, @Nullable Place fallbackPlace) {
         PlaceDetailFragment fragment = new PlaceDetailFragment();
@@ -83,9 +96,14 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         fragment.setArguments(args);
         return fragment;
     }
-    // 保留舊呼叫方式 (相容舊程式)
     public static PlaceDetailFragment newInstance(String placeId) {
         return newInstance(placeId, null);
+    }
+
+    /** 設定來源（"home" / "map"），回傳自身方便鏈式呼叫 */
+    public PlaceDetailFragment setSource(@NonNull String src) {
+        this.source = src;
+        return this;
     }
 
     @Override
@@ -93,7 +111,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         super.onCreate(savedInstanceState);
         favoritesStore = FavoritesStore.getInstance(requireContext());
         storeRepo = new StoresRepository(requireActivity().getApplication());
-        executor = java.util.concurrent.Executors.newSingleThreadExecutor(); // ✨ 2. 新增這一行
+        executor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
         if (getArguments() != null) {
             placeId = getArguments().getString(ARG_PLACE_ID);
@@ -115,6 +133,9 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         initViews(view);
         setupClicks();
 
+        // ✅ 初始化共用 ViewModel（不影響原本功能）
+        homeViewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
+
         // 先顯示備援（如果有帶 Place 進來，讓 UI 先有畫面）
         if (currentPlace != null) {
             bindPlaceToViews(currentPlace);
@@ -127,7 +148,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         // 沒有 id 就只用備援；有 id 才去查資料庫
         if (placeId == null || placeId.isEmpty()) return;
 
-        // 確保已初始化，且等 DB ready 才查
+        // 等 DB ready 才查
         storeRepo.initFromAssets(requireContext());
         storeRepo.getDbReady().observe(getViewLifecycleOwner(), ready -> {
             if (Boolean.TRUE.equals(ready)) {
@@ -161,35 +182,39 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
     }
 
     private void setupClicks() {
-        btnNavigate.setOnClickListener(v -> openGoogleMaps());
+        // ✅ 依來源決定行為（保持原本行為不變）
+        btnNavigate.setOnClickListener(v -> {
+            if (SOURCE_MAP.equals(source)) {
+                // 來源：MapFragment → 外開 Google Maps
+                openGoogleMaps();
+            } else {
+                // 來源：Home/其他 → 進 App 內地圖頁並置中該店（原本功能）
+                openAppMap();
+            }
+        });
+
         btnHeart.setOnClickListener(v -> toggleFavoriteStatus());
         rowHoursHeader.setOnClickListener(v -> toggleHoursVisibility());
         rowPhone.setOnClickListener(v -> dialPhoneNumber());
+        // 點地址列也導到 App 內地圖頁（原本功能）
+        rowAddress.setOnClickListener(v -> openAppMap());
     }
 
     // ------- 讀取本機資料 -------
     private void loadPlaceDetailsLocal() {
-        // 使用我們在 onCreate 中初始化的 executor 來執行背景任務
         executor.execute(() -> {
             try {
-                // 1. 在背景執行緒中，呼叫 Repository 的 blocking 方法
-                List<com.example.fmap.data.local.StoreEntity> entities = storeRepo.getByIdsBlocking(Collections.singletonList(placeId));
+                List<com.example.fmap.data.local.StoreEntity> entities =
+                        storeRepo.getByIdsBlocking(Collections.singletonList(placeId));
 
-                // --- 後續的處理都必須在主執行緒中更新 UI ---
-                // 使用 requireActivity().runOnUiThread() 來確保程式碼在主執行緒執行
                 requireActivity().runOnUiThread(() -> {
                     if (entities == null || entities.isEmpty()) {
-                        // 如果資料庫查不到，但有備援資料，就用備援的
-                        if (currentPlace != null) {
-                            return;
-                        }
-                        // 如果連備援都沒有，就提示錯誤並關閉
+                        if (currentPlace != null) return;
                         Toast.makeText(getContext(), "找不到該店家資料", Toast.LENGTH_LONG).show();
                         dismiss();
                         return;
                     }
 
-                    // 2. 將資料庫模型轉換成 UI 模型
                     com.example.fmap.data.local.StoreEntity e = entities.get(0);
                     Place mapped = com.example.fmap.data.local.StoreMappers.toPlace(e);
 
@@ -200,7 +225,6 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
                         return;
                     }
 
-                    // 3. 更新當前的店家資料並刷新畫面
                     currentPlace = mapped;
                     if (currentPlace.getId() != null) {
                         isCurrentlyFavorite = favoritesStore.contains(currentPlace.getId());
@@ -210,7 +234,6 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
                 });
 
             } catch (Exception e) {
-                // 如果背景任務出錯，也要在主執行緒提示使用者
                 requireActivity().runOnUiThread(() -> {
                     Log.e("PlaceDetailFragment", "loadPlaceDetailsLocal failed", e);
                     Toast.makeText(getContext(), "讀取資料時發生錯誤", Toast.LENGTH_SHORT).show();
@@ -220,7 +243,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
     }
 
     private void bindPlaceToViews(@NonNull Place p) {
-        // 圖片：assets 或 http(s)
+        // 圖片
         Glide.with(this)
                 .load(p.getCoverImageFullPath())
                 .placeholder(new ColorDrawable(Color.parseColor("#E0E0E0")))
@@ -230,7 +253,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         // 名稱
         tvName.setText(!TextUtils.isEmpty(p.getName()) ? p.getName() : "未命名店家");
 
-        // 評分（沒有就隱藏整塊）
+        // 評分
         Double ratingValue = p.getRating();
         View ratingLayout = requireView().findViewById(R.id.layoutRating);
         if (ratingValue == null) {
@@ -241,7 +264,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
             tvRating.setText(String.format(Locale.TAIWAN, "%.1f", ratingValue));
         }
 
-        // Meta：用標籤組成一句（沒有就隱藏）
+        // Meta
         String metaText = (p.getTagsTop3() != null && !p.getTagsTop3().isEmpty())
                 ? TextUtils.join("・", p.getTagsTop3()) : "";
         tvMeta.setText(metaText);
@@ -270,9 +293,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
             rowPhone.setVisibility(View.GONE);
         }
 
-        // 標籤 & 菜單
-        // 只顯示標籤，不顯示菜單
-        //bindChips(chipGroupTags, p.getTagsTop3(), false);
+        // 標籤/菜單（此版暫不顯示）
         if (chipGroupMenu != null) {
             chipGroupMenu.removeAllViews();
             chipGroupMenu.setVisibility(View.GONE);
@@ -319,7 +340,6 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         }
         rowHoursHeader.setVisibility(View.VISIBLE);
 
-        // 今日摘要（以中文鍵）
         Calendar cal = Calendar.getInstance();
         int idx = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7; // Mon=0 … Sun=6
         String todayKey = WEEK_CN[idx];
@@ -328,7 +348,6 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
                 ? "今天：公休"
                 : "今天：" + joinRangesAny(today));
 
-        // 明細列表
         hoursContainer.removeAllViews();
         for (String k : WEEK_CN) {
             List<TimeRange> ranges = findByAliases(map, k);
@@ -341,9 +360,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         }
     }
 
-    private List<TimeRange> findByAliases(
-            Map<String, List<TimeRange>> map, String keyCn) {
-
+    private List<TimeRange> findByAliases(Map<String, List<TimeRange>> map, String keyCn) {
         String[] aliases = aliasesOf(keyCn);
         for (String a : aliases) {
             if (map.containsKey(a)) return map.get(a);
@@ -407,7 +424,6 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         ivHoursChevron.animate().rotation(expand ? 180f : 0f).setDuration(150).start();
 
         if (expand) {
-            // 展開時，若外層是 ScrollView，就捲到這個位置
             View parent = (View) rowHoursHeader.getParent();
             while (parent != null && !(parent instanceof ScrollView)) {
                 View p = (View) parent.getParent();
@@ -419,39 +435,6 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
             }
         }
         rowHoursHeader.setContentDescription(expand ? "收合營業時間" : "展開營業時間");
-    }
-
-    //（下列兩個方法保留給可能的他處使用；已改用 joinRangesAny，不會衝突）
-    private String buildTodaySummary(Map<String, List<TimeRange>> map) {
-        if (map == null || map.isEmpty()) return "無營業時間資料";
-        String today = dayZh(Calendar.getInstance());
-        List<TimeRange> ranges = map.get(today);
-        if (ranges == null || ranges.isEmpty()) return "今天：公休";
-        return "今天：" + joinRangesAny(ranges);
-    }
-
-    private String buildDayLine(String day, Map<String, List<TimeRange>> map) {
-        if (map == null) return null;
-        List<TimeRange> ranges = map.get(day);
-        if (ranges == null || ranges.isEmpty()) return day + "　公休";
-        return day + "　" + joinRangesAny(ranges);
-    }
-
-    private String[] dayOrderZh() {
-        return new String[]{"週一","週二","週三","週四","週五","週六","週日"};
-    }
-
-    private String dayZh(Calendar cal) {
-        int d = cal.get(Calendar.DAY_OF_WEEK);
-        switch (d) {
-            case Calendar.MONDAY: return "週一";
-            case Calendar.TUESDAY: return "週二";
-            case Calendar.WEDNESDAY: return "週三";
-            case Calendar.THURSDAY: return "週四";
-            case Calendar.FRIDAY: return "週五";
-            case Calendar.SATURDAY: return "週六";
-            default: return "週日";
-        }
     }
 
     private int dp(int dp) {
@@ -496,7 +479,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         }
     }
 
-    // --- Google Maps 導航 ---
+    // --- 外開 Google Maps 導航 ---
     private void openGoogleMaps() {
         if (getContext() == null || currentPlace == null) return;
         String query;
@@ -515,6 +498,33 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         }
     }
 
+    // --- 進 App 內 MapFragment 並置中該店 ---
+    private void openAppMap() {
+        if (currentPlace == null) return;
+
+        // ✅ 新增：先丟出「聚焦該店」的事件（不影響原本跳轉路徑）
+        try {
+            if (homeViewModel != null && !TextUtils.isEmpty(currentPlace.getId())) {
+                homeViewModel.requestFocusOnPlace(currentPlace.getId());
+            }
+        } catch (Throwable ignore) { /* 安全防呆，不阻斷原流程 */ }
+
+        Bundle args = new Bundle();
+        if (currentPlace.getLat() != null) args.putDouble("center_lat", currentPlace.getLat());
+        if (currentPlace.getLng() != null) args.putDouble("center_lng", currentPlace.getLng());
+        if (!TextUtils.isEmpty(currentPlace.getId()))   args.putString("store_id", currentPlace.getId());
+        if (!TextUtils.isEmpty(currentPlace.getName())) args.putString("store_name", currentPlace.getName());
+        // 保底帶整個 Place 給地圖頁（命不中也能直接開詳情）
+        args.putSerializable("fallback_place", currentPlace);
+
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).openMapWithArgs(args); // ← 保留原本功能
+            dismiss();
+        } else {
+            Toast.makeText(getContext(), "無法開啟地圖頁（Activity 不符合）", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
@@ -527,6 +537,7 @@ public class PlaceDetailFragment extends BottomSheetDialogFragment {
         });
         return dialog;
     }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
