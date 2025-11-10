@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.location.Address;
 import android.location.Geocoder;
+import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -32,6 +34,7 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -45,6 +48,9 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.tasks.CancellationTokenSource;
+
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -53,6 +59,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class MapFragment extends Fragment implements OnMapReadyCallback {
 
@@ -93,6 +107,20 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     // 地圖 padding（避開搜尋列與底部導覽列）
     private int pendingTopPadding = -1;
+
+    // ====== 後端入口（你的 ngrok）與 JSON ======
+    private static final String ENDPOINT =
+            "https://rattly-excuseless-judie.ngrok-free.dev/api/tools/stores_search";
+    private static final MediaType JSON =
+            MediaType.get("application/json; charset=utf-8");
+
+    // HTTP client 與「是否已送過首次請求」旗標
+    private final OkHttpClient http = new OkHttpClient();
+    private boolean firstQuerySent = false;
+
+    // ====== 上次座標快取（沿用策略） ======
+    private static final String PREF = "loc_pref";
+    private static final String K_LAT="last_lat", K_LNG="last_lng", K_ACC="last_acc", K_TS="last_ts";
 
     public MapFragment() { }
     public static MapFragment newInstance() { return new MapFragment(); }
@@ -197,6 +225,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                     boolean coarse = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
                     if (fine || coarse) {
                         enableMyLocationAndCenter(); // 只啟用圖層/按鈕，不移動鏡頭
+                        // 成功授權：若尚未送出首次查詢，立刻做一次（沿用策略內建）
+                        if (!firstQuerySent) acquireLocationThenSearch(false, getCurrentTags());
                     } else {
                         Toast.makeText(requireContext(), "未授權定位權限，無法顯示我的位置", Toast.LENGTH_SHORT).show();
                     }
@@ -256,6 +286,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         // 啟用藍點與內建按鈕（不移動鏡頭）
         enableMyLocationAndCenter();
 
+        // 首次進入頁面 → 若尚未送過，嘗試做一次查詢（取得新定位或沿用上次座標）
+        if (!firstQuerySent) acquireLocationThenSearch(false, getCurrentTags());
+
         // 初始鏡頭：argCenter > DEV_POINT > 不動
         if (argCenter != null) {
             this.map.moveCamera(CameraUpdateFactory.newLatLngZoom(argCenter, 16f));
@@ -279,19 +312,20 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             return true;
         });
 
-        // 監聽內建定位按鈕（回傳 false 交給預設行為）
+        // 監聽內建定位按鈕：保留預設行為 + 追加查詢（即時更新）
         this.map.setOnMyLocationButtonClickListener(() -> {
             Toast.makeText(requireContext(), "正在聚焦到我的位置...", Toast.LENGTH_SHORT).show();
-            return false;
+            acquireLocationThenSearch(true, getCurrentTags()); // 移動鏡頭 + 送查詢
+            return false; // 讓 Google Map 預設鏡頭行為繼續
         });
 
         // 畫面上畫既有資料
         if (pendingPlaces != null && !pendingPlaces.isEmpty()) {
             renderMarkers(pendingPlaces);
         } else {
-            List<Place> cur = homeViewModel.getPlaces().getValue();
-            if (cur != null && !cur.isEmpty()) {
-                pendingPlaces = new ArrayList<>(cur);
+            List<Place> cur2 = homeViewModel.getPlaces().getValue();
+            if (cur2 != null && !cur2.isEmpty()) {
+                pendingPlaces = new ArrayList<>(cur2);
                 renderMarkers(pendingPlaces);
             }
         }
@@ -491,7 +525,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         try {
             map.setMyLocationEnabled(true);
             map.getUiSettings().setMyLocationButtonEnabled(true);
-            // ❌ 不在這裡移動鏡頭，交給內建按鈕或使用者操作
         } catch (SecurityException ignored) { }
     }
 
@@ -538,21 +571,169 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     public void onResume() {
         super.onResume();
         Log.d(TAG, "onResume()");
-        if (getActivity() instanceof MainActivity) {
-            ((MainActivity) getActivity()).setDrawerIconEnabled(false);
-        }
+        try {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).setDrawerIconEnabled(false);
+            }
+        } catch (Throwable ignored) {}
     }
 
     @Override
     public void onPause() {
         super.onPause();
         Log.d(TAG, "onPause()");
-        if (getActivity() instanceof MainActivity) {
-            ((MainActivity) getActivity()).setDrawerIconEnabled(true);
-        }
+        try {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).setDrawerIconEnabled(true);
+            }
+        } catch (Throwable ignored) {}
     }
 
     private int dp(int dps) {
         return (int) (dps * getResources().getDisplayMetrics().density);
+    }
+
+    // ====== 位置沿用策略：儲存 / 讀取上次座標 ======
+    private void saveLastLocation(double lat, double lng, float acc, long tsMs){
+        requireContext().getSharedPreferences(PREF, 0)
+                .edit()
+                .putLong(K_TS, tsMs)
+                .putFloat(K_ACC, acc)
+                .putString(K_LAT, String.valueOf(lat))
+                .putString(K_LNG, String.valueOf(lng))
+                .apply();
+    }
+
+    @Nullable
+    private Location loadLastLocation(){
+        var sp = requireContext().getSharedPreferences(PREF, 0);
+        if(!sp.contains(K_LAT) || !sp.contains(K_LNG)) return null;
+        Location loc = new Location("cached");
+        loc.setLatitude(Double.parseDouble(sp.getString(K_LAT,"0")));
+        loc.setLongitude(Double.parseDouble(sp.getString(K_LNG,"0")));
+        loc.setAccuracy(sp.getFloat(K_ACC, 0f));
+        loc.setTime(sp.getLong(K_TS, System.currentTimeMillis()));
+        return loc;
+    }
+
+    // ====== 核心：取得一次定位 → 儲存 → 送查詢（首次和按定位都用它） ======
+    private void acquireLocationThenSearch(boolean moveCamera, @NonNull List<String> tags){
+        boolean fineGranted = ContextCompat.checkSelfPermission(requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean coarseGranted = ContextCompat.checkSelfPermission(requireContext(),
+                Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+
+        if (!(fineGranted || coarseGranted)) {
+            permissionLauncher.launch(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            });
+            return;
+        }
+
+        if (fusedClient == null) fusedClient = LocationServices.getFusedLocationProviderClient(requireContext());
+        CancellationTokenSource cts = new CancellationTokenSource();
+
+        fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.getToken())
+                .addOnSuccessListener(loc -> {
+                    Location useLoc = loc;
+                    if (useLoc == null) {
+                        // 取不到 → 沿用上次
+                        useLoc = loadLastLocation();
+                        if (useLoc == null) {
+                            Toast.makeText(requireContext(),"尚未取得定位，請按定位一次",Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                    } else {
+                        // 取到新值 → 儲存以便下次沿用
+                        saveLastLocation(useLoc.getLatitude(), useLoc.getLongitude(),
+                                useLoc.getAccuracy(), System.currentTimeMillis());
+                    }
+
+                    if (moveCamera && map != null){
+                        map.animateCamera(CameraUpdateFactory.newLatLngZoom(
+                                new LatLng(useLoc.getLatitude(), useLoc.getLongitude()), 16f));
+                    }
+
+                    postStoresSearch(useLoc, tags, false); // rank_by_distance 固定 false（依需求）
+                    firstQuerySent = true;
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(requireContext(),"定位失敗："+e.getMessage(),Toast.LENGTH_SHORT).show());
+    }
+
+    // ====== 送出 stores_search 請求（完全照你的協議） ======
+    private void postStoresSearch(@NonNull Location loc,
+                                  @NonNull List<String> tags,
+                                  boolean rankByDistance){
+        try {
+            JSONObject root = new JSONObject();
+            root.put("intent", "store_by_tag");
+
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for(String t: tags) arr.put(t);
+            root.put("tags", arr);
+
+            JSONObject locObj = new JSONObject();
+            locObj.put("lat", loc.getLatitude());
+            locObj.put("lng", loc.getLongitude());
+            locObj.put("accuracy_m", (double)loc.getAccuracy());
+            locObj.put("source", "android_gps");
+            locObj.put("timestamp", System.currentTimeMillis());
+            root.put("location", locObj);
+
+            root.put("rank_by_distance", rankByDistance);
+
+            RequestBody body = RequestBody.create(root.toString(), JSON);
+            Request req = new Request.Builder()
+                    .url(ENDPOINT)
+                    .post(body)
+                    .addHeader("Content-Type", "application/json")
+                    .build();
+
+            http.newCall(req).enqueue(new Callback() {
+                @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    if (!isAdded()) return;
+                    requireActivity().runOnUiThread(() ->
+                            Toast.makeText(requireContext(),"搜尋失敗："+e.getMessage(),Toast.LENGTH_SHORT).show());
+                }
+                @Override public void onResponse(@NonNull Call call, @NonNull Response resp) throws IOException {
+                    String respBody = resp.body()!=null ? resp.body().string() : "";
+                    resp.close();
+                    if (!isAdded()) return;
+                    requireActivity().runOnUiThread(() -> {
+                        if (resp.isSuccessful()) {
+                            // TODO: 把 respBody 丟給 VM/Adapter，使用 results[*].distance_km/matched[*].distance_km 顯示
+                            Toast.makeText(requireContext(), "搜尋成功", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(requireContext(), "搜尋 HTTP "+resp.code(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+            });
+        } catch (Exception e) {
+            if (!isAdded()) return;
+            Toast.makeText(requireContext(), "封包錯誤："+e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ====== 取得目前 tags：優先從 HomeViewModel 讀，否則退回 ["咖哩"] ======
+    @NonNull
+    private List<String> getCurrentTags(){
+        // 嘗試用反射讀取 homeViewModel.getSelectedTags() 的 LiveData<List<String>>
+        try {
+            Object live = homeViewModel.getClass().getMethod("getSelectedTags").invoke(homeViewModel);
+            if (live instanceof androidx.lifecycle.LiveData) {
+                Object val = ((androidx.lifecycle.LiveData<?>) live).getValue();
+                if (val instanceof List) {
+                    List<?> raw = (List<?>) val;
+                    List<String> out = new ArrayList<>();
+                    for (Object o : raw) if (o != null) out.add(o.toString());
+                    if (!out.isEmpty()) return out;
+                }
+            }
+        } catch (Throwable ignored) {}
+        // Fallback：示範用，請換成你要的預設
+        return java.util.Arrays.asList("咖哩");
     }
 }
